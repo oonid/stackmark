@@ -5,6 +5,7 @@ dist/
 .idea
 npm-debug.log*
 .vscode
+.worktrees/
 stackedit_v4
 chrome-app/*.zip
 /test/unit/coverage/
