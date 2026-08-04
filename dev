@@ -1,0 +1,36 @@
+#!/bin/sh
+set -eu
+
+repo_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+command_name=${1:-help}
+pnpm_bin=${PNPM_BIN:-pnpm}
+HOST_UID=${HOST_UID:-$(id -u)}
+HOST_GID=${HOST_GID:-$(id -g)}
+export HOST_UID HOST_GID
+
+run_compose() {
+  exec docker compose --project-directory "$repo_root" -f "$repo_root/compose.yaml" "$@"
+}
+
+run_pnpm() {
+  if [ "${STACKEDIT_IN_BUILDER:-0}" = "1" ]; then
+    exec "$pnpm_bin" "$@"
+  fi
+  run_compose run --rm js pnpm "$@"
+}
+
+case "$command_name" in
+  frontend-dev) run_compose up frontend ;;
+  frontend-build) run_pnpm build ;;
+  unit) run_pnpm unit ;;
+  e2e) run_pnpm e2e ;;
+  lint) run_pnpm lint ;;
+  install) run_pnpm install --frozen-lockfile ;;
+  install-update) run_pnpm install ;;
+  shell) run_compose run --rm js bash ;;
+  versions) run_pnpm versions ;;
+  *)
+    printf '%s\n' 'usage: ./dev {frontend-dev|frontend-build|unit|e2e|lint|install|install-update|shell|versions}' >&2
+    exit 64
+    ;;
+esac

@@ -1,0 +1,26 @@
+services:
+  js:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+      args:
+        HOST_UID: "${HOST_UID:-1000}"
+        HOST_GID: "${HOST_GID:-1000}"
+    working_dir: /workspace
+    environment:
+      HOME: /tmp/stackedit-home
+      PNPM_HOME: /tmp/stackedit-pnpm
+    volumes:
+      - .:/workspace
+      - pnpm-store:/pnpm/store
+      - node-modules:/workspace/node_modules
+  frontend:
+    extends:
+      service: js
+    command: pnpm --filter @stackedit/web dev --host 0.0.0.0
+    ports:
+      - "127.0.0.1:1420:1420"
+
+volumes:
+  pnpm-store:
+  node-modules:

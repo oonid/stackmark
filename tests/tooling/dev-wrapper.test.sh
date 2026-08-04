@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root=$(cd "$(dirname "$0")/../.." && pwd -P)
+test_dir=$(mktemp -d)
+trap 'rm -rf "$test_dir"' EXIT
+
+cat >"$test_dir/docker" <<'SH'
+#!/usr/bin/env sh
+set -eu
+printf '%s\n' "$*" >"$STACKEDIT_DOCKER_ARGS"
+printf '%s:%s\n' "$HOST_UID" "$HOST_GID" >"$STACKEDIT_DOCKER_IDS"
+SH
+chmod +x "$test_dir/docker"
+
+cat >"$test_dir/pnpm" <<'SH'
+#!/usr/bin/env sh
+set -eu
+printf '%s\n' "$*" >"$STACKEDIT_PNPM_ARGS"
+SH
+chmod +x "$test_dir/pnpm"
+
+export STACKEDIT_DOCKER_ARGS="$test_dir/docker.args"
+export STACKEDIT_DOCKER_IDS="$test_dir/docker.ids"
+export STACKEDIT_PNPM_ARGS="$test_dir/pnpm.args"
+
+(
+  cd "$repo_root/tests"
+  PATH="$test_dir:$PATH" "$repo_root/dev" unit
+)
+
+expected_compose_args="compose --project-directory $repo_root -f $repo_root/compose.yaml run --rm js pnpm unit"
+grep -Fx "$expected_compose_args" "$STACKEDIT_DOCKER_ARGS"
+grep -Fx "$(id -u):$(id -g)" "$STACKEDIT_DOCKER_IDS"
+
+(
+  cd "$repo_root/tests"
+  PATH="$test_dir:$PATH" STACKEDIT_IN_BUILDER=1 PNPM_BIN="$test_dir/pnpm" \
+    "$repo_root/dev" frontend-build
+)
+
+grep -Fx 'build' "$STACKEDIT_PNPM_ARGS"
+
+set +e
+PATH="$test_dir:$PATH" "$repo_root/dev" unknown-command >"$test_dir/unknown.out" 2>"$test_dir/unknown.err"
+status=$?
+set -e
+
+test "$status" -eq 64
+grep -F 'usage: ./dev' "$test_dir/unknown.err"
+
+grep -Fx 'FROM node:24.18.0-bookworm-slim' "$repo_root/docker/frontend.Dockerfile"
+grep -Fx 'ENV COREPACK_HOME=/opt/stackedit-corepack' "$repo_root/docker/frontend.Dockerfile"
+grep -F 'corepack prepare pnpm@11.20.0 --activate' "$repo_root/docker/frontend.Dockerfile"
+grep -F 'node --version | grep -Fx' "$repo_root/docker/frontend.Dockerfile"
+grep -F 'pnpm --version | grep -Fx' "$repo_root/docker/frontend.Dockerfile"
+grep -F 'USER stackedit' "$repo_root/docker/frontend.Dockerfile"
+grep -F 'mkdir -p /workspace/node_modules /pnpm/store' "$repo_root/docker/frontend.Dockerfile"
+grep -F 'chown -R stackedit:stackedit /workspace /pnpm' "$repo_root/docker/frontend.Dockerfile"
+
+grep -Fx '      dockerfile: docker/frontend.Dockerfile' "$repo_root/compose.yaml"
+grep -Fx '      - "127.0.0.1:1420:1420"' "$repo_root/compose.yaml"
+grep -Fx '      - pnpm-store:/pnpm/store' "$repo_root/compose.yaml"
+grep -Fx '      - node-modules:/workspace/node_modules' "$repo_root/compose.yaml"
+
+grep -Fx 'store-dir=/pnpm/store' "$repo_root/.npmrc"
+grep -Fx '.git' "$repo_root/.dockerignore"
+grep -Fx 'node_modules' "$repo_root/.dockerignore"
+grep -Fx '**/node_modules' "$repo_root/.dockerignore"
+grep -Fx 'dist' "$repo_root/.dockerignore"
+grep -Fx 'target' "$repo_root/.dockerignore"
+grep -Fx '*.pdf' "$repo_root/.dockerignore"
+grep -Fx '.engineering/' "$repo_root/.dockerignore"
+
+grep -F '"name": "stackedit-modern"' "$repo_root/package.json"
+grep -F '"private": true' "$repo_root/package.json"
+grep -F '"packageManager": "pnpm@11.20.0"' "$repo_root/package.json"
+grep -F '"node": "24.18.0"' "$repo_root/package.json"
+grep -F '"versions"' "$repo_root/package.json"
+grep -F '"build"' "$repo_root/package.json"
+grep -F '"unit"' "$repo_root/package.json"
+grep -F '"e2e"' "$repo_root/package.json"
+grep -F '"lint"' "$repo_root/package.json"
+grep -Fx "  - 'apps/*'" "$repo_root/pnpm-workspace.yaml"
+grep -Fx "  - 'packages/*'" "$repo_root/pnpm-workspace.yaml"
