@@ -24,6 +24,7 @@ The following decisions are approved:
 - The architecture must permit a future optional WYSIWYG adapter without making it a phase-one deliverable.
 - The initial desktop target is Linux x86-64, tested on KDE Neon based on Ubuntu LTS.
 - The primary desktop artifact is a Debian package. AppImage may be added after the Debian package is stable.
+- The host does not require Node.js, pnpm, or other JavaScript tooling. JavaScript development, builds, linting, and tests run through Docker.
 - Web and desktop workspaces are independent in phase one. Transfer is explicit through Markdown and ZIP import/export.
 - Printing and PDF output are phase-one capabilities. PDF is produced through the browser or GTK print dialog rather than a headless one-click exporter.
 - Google Drive, GitHub, GitLab, Dropbox, and other providers will be adopted later through provider and synchronization interfaces.
@@ -41,6 +42,7 @@ Phase one will provide:
 7. CommonMark, GitHub-style Markdown features, footnotes, tasks, syntax-highlighted code, KaTeX, and Mermaid.
 8. A first-class Print Studio with page preview, print themes, resource preflight, physical printing, and Save-to-PDF through the system dialog.
 9. A reproducible Linux `.deb` release and a test suite covering core, platform, rendering, security, and print behavior.
+10. A reproducible Docker-based JavaScript development environment that does not install Node.js or pnpm on the host.
 
 ## 4. Non-Goals
 
@@ -122,6 +124,7 @@ The implementation will use stable supported releases pinned at implementation t
 | Area | Choice |
 |---|---|
 | Workspace | pnpm workspaces |
+| JavaScript environment | Docker with a pinned Node LTS image and Corepack-managed pnpm |
 | Frontend | Vue 3 Composition API and TypeScript |
 | Build | Vite |
 | UI/session state | Pinia |
@@ -140,7 +143,34 @@ The implementation will use stable supported releases pinned at implementation t
 
 The Node version is a supported LTS release compatible with the selected Vite version and is pinned in repository tooling. Rust is pinned through a toolchain file. Lockfiles are committed.
 
-## 7. Document and Workspace Model
+## 7. Containerized Development Environment
+
+The host is not expected to provide Node.js, pnpm, Vite, or browser-test dependencies. All JavaScript package installation, development servers, builds, formatting, linting, unit tests, component tests, and browser automation run in project-owned Docker images.
+
+The repository provides `./dev` as the single development entry point around Docker Compose so contributors do not need to memorize container commands. The wrapper supports at least development server, shell, lint, unit test, end-to-end test, production web build, and dependency update operations.
+
+The container design follows these rules:
+
+- The Node LTS image is pinned by digest or an equivalently reproducible identifier.
+- pnpm is activated and pinned through Corepack and `packageManager` metadata.
+- Source is bind-mounted into the container.
+- pnpm's download store and container `node_modules` use named volumes so Linux host files are not polluted with container-specific dependencies.
+- Processes run with the invoking user's UID and GID so generated files are not owned by root.
+- The Vite development server listens inside the container but is published only to the host loopback interface.
+- The browser-test image pins browser binaries and their operating-system dependencies.
+- Docker build stages are cached without copying host dependency directories.
+- The legacy StackEdit Dockerfile is not reused as the modern development image.
+- Continuous integration uses the same Docker definitions as local development.
+
+Interactive Tauri development uses a split workflow. Docker runs the Vite frontend development server, while `cargo tauri dev` runs on the KDE host and connects to that server. This avoids fragile Wayland/X11 and WebKitGTK GUI forwarding from a container. The host therefore needs Docker with Compose, Rust/Cargo, and Tauri's native WebKitGTK/GTK development packages, but still does not need a JavaScript toolchain.
+
+The Tauri `beforeDevCommand` and `beforeBuildCommand` invoke `./dev frontend-dev` and `./dev frontend-build` respectively. The wrapper has two explicit modes: on the host it dispatches through Docker Compose; inside a project builder container, identified by a repository-defined environment marker, it directly executes the pinned pnpm command. This prevents Docker-in-Docker during release builds while preserving one documented entry point. A developer can therefore use the normal Cargo/Tauri entry point without installing Node.js.
+
+Release `.deb` artifacts are built in a separate pinned Ubuntu-LTS builder image containing Node, pnpm, Rust, and Tauri's native build dependencies. This controls the glibc/WebKitGTK build baseline and makes package output reproducible. The builder writes artifacts with the host user's ownership. Interactive desktop smoke tests and WebKitGTK print tests still run on the KDE host after the containerized build.
+
+Docker network access is permitted for dependency installation and explicit test fixtures. This does not change the product requirement that installed web and desktop applications perform core authoring and printing offline.
+
+## 8. Document and Workspace Model
 
 The shared document model is deliberately small:
 
@@ -171,7 +201,7 @@ The application does not create hidden metadata files in a user's workspace. Mov
 
 Markdown files are ordinary user files. Other files are treated as assets and are shown only when relevant. Recent documents, cursor positions, layout preferences, recovery entries, and revision history remain in application data rather than polluting the workspace.
 
-## 8. Saving, Recovery, History, and Conflicts
+## 9. Saving, Recovery, History, and Conflicts
 
 Editor changes update the active in-memory document immediately. Autosave starts after 750 milliseconds without another content change. Recovery journaling is independent of the final save and occurs at least every two seconds while dirty, on window blur, and before application shutdown when possible.
 
@@ -192,7 +222,7 @@ History is bounded. Each document retains its most recent 50 meaningful revision
 
 Desktop deletion uses the operating-system trash when supported. If trash is unavailable, permanent deletion requires an explicit confirmation. Web deletion is represented as a recoverable workspace change until history retention expires.
 
-## 9. Editor and Preview
+## 10. Editor and Preview
 
 CodeMirror is isolated behind an `EditorAdapter`. Vue components do not persist CodeMirror state as document content. An `EditorSession` coordinates editor transactions, autosave, recovery, preview refresh, and conflict state.
 
@@ -225,7 +255,7 @@ Rendered block elements retain source-line information. Scroll synchronization m
 
 Rendering is debounced. Mathematics, highlighted code, and diagrams are cached by content hash and rendering configuration. The renderer contract permits parsing to move to a web worker if large-document profiling shows that it is needed.
 
-## 10. Mermaid and SVG Rendering
+## 11. Mermaid and SVG Rendering
 
 Mermaid fenced blocks are supported in live preview and printed output. Mermaid source is never inserted as HTML and is not executed in the privileged application window.
 
@@ -250,7 +280,7 @@ Print Studio attempts to keep a diagram on one page. Oversized diagrams use fit-
 
 Security regression tests cover representative diagram families, malformed definitions, resource-loading attempts, CSS injection, HTML injection, script attributes, and known advisory patterns.
 
-## 11. Print Studio and PDF
+## 12. Print Studio and PDF
 
 Print Studio is a dedicated workspace rather than a generic export dialog:
 
@@ -288,7 +318,7 @@ Print remains disabled until bundled fonts, permitted images, KaTeX, Mermaid, an
 
 The printable document runs in an isolated view without filesystem, shell, process, updater, or repository capabilities. `window.print()` opens the browser or GTK print dialog. Phase one does not directly write PDF bytes and does not bundle Chromium, wkhtmltopdf, Pandoc, or LaTeX.
 
-## 12. Interface and Workflow
+## 13. Interface and Workflow
 
 The primary layout contains a command bar, explorer, Markdown editor, preview, and status bar. Explorer, editor, and preview panes are independently resizable. Users can switch between editor-only, split, preview-only, and Print Studio modes. Narrow browser windows use tabs rather than compressing all panes.
 
@@ -302,7 +332,7 @@ The visual direction is modern and restrained rather than a pixel-perfect StackE
 
 Phase one contains no accounts, provider buttons, sponsorship UI, publishing panels, or collaboration controls.
 
-## 13. Security Model
+## 14. Security Model
 
 The Tauri main window receives only the capabilities required for dialogs, approved workspace operations, and opening external links. Preview and print views receive no native capabilities.
 
@@ -316,7 +346,7 @@ HTML and SVG use separate sanitizer policies. Scripts, event handlers, unsafe UR
 
 Phase one has no analytics or automatic crash uploading. Logs omit document content. Future credentials use encrypted secure storage rather than IndexedDB or `localStorage`.
 
-## 14. Error Handling and Diagnostics
+## 15. Error Handling and Diagnostics
 
 Errors are classified as transient, action-required, or conflicts.
 
@@ -330,7 +360,7 @@ Errors have stable codes and structured context. Desktop logs rotate locally and
 
 Release artifacts include checksums. Dependency manifests and vulnerability audits run in continuous integration. Public package signing is added when a stable public distribution channel is established.
 
-## 15. Testing Strategy
+## 16. Testing Strategy
 
 Testing is layered:
 
@@ -344,14 +374,15 @@ Testing is layered:
 8. Print visual tests compare representative paginated pages. Chromium automation is supplemented with WebKitGTK smoke tests on Linux.
 9. Security tests exercise malicious HTML, SVG, Mermaid, paths, URLs, and oversized inputs.
 10. Fault-injection tests simulate quota exhaustion, permission errors, disk failures, interrupted writes, and application restarts.
+11. Container tests verify a clean host with Docker, Rust, and Tauri native packages—but no Node.js or pnpm—can run every documented JavaScript workflow.
 
 Tests must verify observable behavior rather than private implementation details. Platform contract tests are a release gate because they keep the web and desktop application core genuinely shared.
 
-## 16. Delivery Stages
+## 17. Delivery Stages
 
 ### Stage 0: Technical proof
 
-On KDE Neon, prove folder selection, atomic Markdown save, external-change detection, Mermaid and KaTeX rendering, Paged.js pagination, GTK print-to-PDF, and `.deb` installation. Failure of an enhancement must identify a fallback before further implementation.
+On KDE Neon, first prove that the Dockerized JavaScript toolchain works without host Node.js or pnpm. Then prove folder selection, atomic Markdown save, external-change detection, Mermaid and KaTeX rendering, Paged.js pagination, GTK print-to-PDF, containerized `.deb` production, and package installation. Failure of an enhancement must identify a fallback before further implementation.
 
 ### Stage 1: Shared foundation
 
@@ -371,7 +402,7 @@ Complete accessibility and keyboard review, large-document profiling, security a
 
 Each stage is a separate implementation plan with its own acceptance checks. Stage 0 is mandatory before committing to deeper implementation of platform-specific or paged-output behavior.
 
-## 17. Phase-One Acceptance Criteria
+## 18. Phase-One Acceptance Criteria
 
 Phase one is complete only when:
 
@@ -387,8 +418,10 @@ Phase one is complete only when:
 10. Core editing and printing work without network access.
 11. Web and desktop repository implementations pass the same behavioral contract suite.
 12. Future provider integration can be added without changing the canonical document model.
+13. A clean supported host without Node.js or pnpm can run all JavaScript development, build, lint, and test workflows through the documented Docker wrapper.
+14. The release builder produces a `.deb` from its pinned Ubuntu-LTS container, and the artifact passes host-native KDE Neon smoke and print tests.
 
-## 18. Future Provider Compatibility
+## 19. Future Provider Compatibility
 
 Provider work begins only after phase-one acceptance. A provider supplies authentication, remote listing, download, upload, revision metadata, and optional change polling through explicit interfaces. Synchronization consumes those interfaces and the shared document repository; it does not add provider-specific state to Vue components or Markdown content.
 
@@ -396,7 +429,7 @@ Providers that require a private OAuth secret may require a small hosted broker.
 
 Initial candidates are GitHub/GitLab and Google Drive, but their order is not part of phase one.
 
-## 19. Implementation and Review Loop
+## 20. Implementation and Review Loop
 
 The workflow for later implementation is:
 
@@ -411,7 +444,7 @@ No implementation is considered complete solely because its implementer reports 
 
 Roles are filled as specified above. If a role cannot be filled, work pauses and reports the mismatch rather than silently reassigning it.
 
-## 20. External Technical References
+## 21. External Technical References
 
 - [Vue 2 end-of-life notice](https://v2.vuejs.org/eol/)
 - [Vue tooling guidance](https://vuejs.org/guide/scaling-up/tooling)
@@ -426,4 +459,3 @@ Roles are filled as specified above. If a role cannot be filled, work pauses and
 - [CSS paged media](https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Paged_media)
 - [Mermaid security configuration](https://mermaid.js.org/config/schema-docs/config-properties-securitylevel.html)
 - [Mermaid security advisories](https://github.com/mermaid-js/mermaid/security)
-
