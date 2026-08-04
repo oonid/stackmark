@@ -1,0 +1,106 @@
+:root {
+  color: #1f2937;
+  background: #f5f7fb;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+textarea {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  border-radius: 0.45rem;
+  padding: 0.65rem 0.9rem;
+  color: white;
+  background: #2155a5;
+  cursor: pointer;
+}
+
+button:disabled {
+  color: #697586;
+  background: #d8dee8;
+  cursor: not-allowed;
+}
+
+.proof-shell {
+  width: min(72rem, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 3rem 0;
+}
+
+.proof-header {
+  max-width: 46rem;
+  margin-bottom: 2rem;
+}
+
+.proof-header h1,
+.proof-card h2,
+.proof-header p {
+  margin-top: 0;
+}
+
+.eyebrow {
+  color: #2155a5;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.proof-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 1rem;
+}
+
+.proof-card {
+  display: flex;
+  min-height: 13rem;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  border: 1px solid #d8dee8;
+  border-radius: 0.75rem;
+  background: white;
+  box-shadow: 0 0.3rem 1rem rgb(31 41 55 / 8%);
+}
+
+.proof-card > :last-child {
+  margin-bottom: 0;
+}
+
+textarea,
+.preview-panel {
+  width: 100%;
+  min-height: 10rem;
+  flex: 1;
+  border: 1px solid #aab6c6;
+  border-radius: 0.45rem;
+  padding: 0.75rem;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.preview-panel {
+  overflow: auto;
+  background: #f8fafc;
+}
+
+.preview-panel p {
+  margin-top: 0;
+}
+
+.preview-panel pre {
+  white-space: pre-wrap;
+}
