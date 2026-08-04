@@ -1,8 +1,26 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
+import { renderMarkdown } from '@stackedit/markdown'
 import initialMarkdown from '../../../tests/fixtures/print-proof.md?raw'
 
 const markdownSource = ref(initialMarkdown)
+const renderedMarkdown = ref(renderMarkdown(markdownSource.value))
+let renderTimer: ReturnType<typeof window.setTimeout> | undefined
+
+watch(markdownSource, (source) => {
+  if (renderTimer) {
+    window.clearTimeout(renderTimer)
+  }
+  renderTimer = window.setTimeout(() => {
+    renderedMarkdown.value = renderMarkdown(source)
+  }, 150)
+})
+
+onBeforeUnmount(() => {
+  if (renderTimer) {
+    window.clearTimeout(renderTimer)
+  }
+})
 
 function printProof(): void {
   window.print()
@@ -31,8 +49,8 @@ function printProof(): void {
       <section class="proof-card" aria-labelledby="preview-heading">
         <h2 id="preview-heading">Preview</h2>
         <article data-testid="rendered-preview" class="preview-panel">
-          <p>Markdown rendering is intentionally proved in the next Stage 0 slice.</p>
-          <pre>{{ markdownSource }}</pre>
+          <!-- eslint-disable-next-line vue/no-v-html -- renderMarkdown is the single reviewed DOMPurify boundary. -->
+          <div v-html="renderedMarkdown.html" />
         </article>
       </section>
 
