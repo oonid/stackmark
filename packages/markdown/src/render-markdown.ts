@@ -56,7 +56,19 @@ function createMarkdownRenderer(): MarkdownIt {
   renderer.block.ruler.before('fence', 'math_block', (state, startLine, endLine, silent) => {
     const start = state.bMarks[startLine] + state.tShift[startLine]
     const maximum = state.eMarks[startLine]
-    if (state.src.slice(start, maximum).trim() !== '$$') return false
+    const delimiterLine = state.src.slice(start, maximum).trim()
+    const singleLineMath = /^\$\$(.+)\$\$$/.exec(delimiterLine)
+    if (singleLineMath) {
+      if (!silent) {
+        const token = state.push('math_block', 'math', 0)
+        token.block = true
+        token.content = singleLineMath[1]
+        token.map = [startLine, startLine + 1]
+      }
+      state.line = startLine + 1
+      return true
+    }
+    if (delimiterLine !== '$$') return false
 
     let nextLine = startLine + 1
     while (nextLine < endLine) {

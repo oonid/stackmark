@@ -32,6 +32,13 @@ const proof = true
     expect(result.html).not.toContain('\\frac{a}{b}')
   })
 
+  it('renders paired single-line display KaTeX instead of leaving its delimiters in the preview', () => {
+    const result = renderMarkdown('$$x^2$$')
+
+    expect(result.html).toContain('class="katex-display"')
+    expect(result.html).not.toContain('$$x^2$$')
+  })
+
   it('removes scripts, event attributes, javascript URLs, and SVG from preview HTML', () => {
     const result = renderMarkdown(
       '<script>alert(1)</script><img src="x" onerror="alert(1)"><a href="javascript:alert(1)">unsafe</a><svg><circle /></svg>',
