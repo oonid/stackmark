@@ -11,7 +11,7 @@
     "build": "pnpm -r --if-present build",
     "unit": "pnpm -r --if-present unit",
     "e2e": "pnpm -r --if-present e2e",
-    "lint": "pnpm -r --if-present typecheck && eslint apps eslint.config.js"
+    "lint": "pnpm -r --if-present typecheck && eslint --no-error-on-unmatched-pattern apps packages eslint.config.js"
   },
   "devDependencies": {
     "@eslint/js": "9.39.1",
