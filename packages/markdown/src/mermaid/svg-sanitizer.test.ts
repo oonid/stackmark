@@ -37,6 +37,18 @@ describe('sanitizeMermaidSvg', () => {
     expect(result).not.toMatch(/https:\/\/attacker\.invalid|javascript:|<image|url\(/i)
   })
 
+  it('removes style elements and CSS-escaped external URL values', () => {
+    const result = sanitizeMermaidSvg(String.raw`
+      <svg viewBox="0 0 10 10">
+        <style>.node { fill: u\\72l(https://attacker.invalid/style.svg); }</style>
+        <path fill="u\\72l(https://attacker.invalid/paint.svg)" d="M0 0L1 1" />
+      </svg>
+    `)
+
+    expect(result).toContain('<path')
+    expect(result).not.toMatch(/<style|attacker\.invalid|u\\\\72l/i)
+  })
+
   it('keeps fragment-only marker references while rejecting all non-fragment URLs', () => {
     const result = sanitizeMermaidSvg(`
       <svg viewBox="0 0 10 10">

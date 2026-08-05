@@ -12,6 +12,7 @@ const forbiddenTags = [
   'object',
   'script',
   'set',
+  'style',
   'video',
 ]
 
@@ -41,12 +42,8 @@ export function sanitizeMermaidSvg(svg: string): string {
   if (!root) return ''
 
   root.querySelectorAll(forbiddenTags.join(',')).forEach((node) => node.remove())
-  root.querySelectorAll('style').forEach((style) => {
-    if (/@import|url\s*\(|expression\s*\(|javascript:|behavior\s*:|-moz-binding/i.test(style.textContent ?? '')) {
-      style.remove()
-    }
-  })
-  root.querySelectorAll('*').forEach((element) => {
+  const elements = [root, ...root.querySelectorAll('*')]
+  elements.forEach((element) => {
     for (const attribute of [...element.attributes]) {
       const name = attribute.name.toLowerCase()
       const value = attribute.value.trim()
@@ -61,8 +58,11 @@ export function sanitizeMermaidSvg(svg: string): string {
         continue
       }
 
-      if (fragmentUrlAttributes.has(name) && /url\s*\(/i.test(value) && !isFragmentUrl(value)) {
-        element.removeAttribute(attribute.name)
+      if (fragmentUrlAttributes.has(name)) {
+        if (isFragmentUrl(value)) continue
+        if (/\\|\/\*|\*\/|(?:^|[^\w-])url|(?:https?|data|blob|file):|\/\//i.test(value)) {
+          element.removeAttribute(attribute.name)
+        }
       }
     }
   })

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { renderMarkdown } from '@stackedit/markdown'
-import MermaidBlock from './mermaid/MermaidBlock.vue'
+import MarkdownPreview from './MarkdownPreview.vue'
 import initialMarkdown from '../../../tests/fixtures/print-proof.md?raw'
 
 const markdownSource = ref(initialMarkdown)
@@ -50,13 +50,7 @@ function printProof(): void {
       <section class="proof-card" aria-labelledby="preview-heading">
         <h2 id="preview-heading">Preview</h2>
         <article data-testid="rendered-preview" class="preview-panel">
-          <!-- eslint-disable-next-line vue/no-v-html -- renderMarkdown is the single reviewed DOMPurify boundary. -->
-          <div v-html="renderedMarkdown.html" />
-          <MermaidBlock
-            v-for="block in renderedMarkdown.mermaidBlocks"
-            :key="block.id"
-            :source="block.source"
-          />
+          <MarkdownPreview :rendered="renderedMarkdown" />
         </article>
       </section>
 

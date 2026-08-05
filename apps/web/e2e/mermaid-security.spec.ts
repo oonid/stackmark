@@ -58,3 +58,33 @@ flowchart TD
   await expect(source).toHaveValue(/not valid mermaid/)
   await expect(page.getByTestId('stage-zero-title')).toBeVisible()
 })
+
+test('rejects CSS-escaped external URLs before SVG enters the parent document', async ({ page }) => {
+  const offOriginRequests: string[] = []
+  page.on('request', (request) => {
+    const url = new URL(request.url())
+    if (url.origin !== 'http://127.0.0.1:1420') offOriginRequests.push(request.url())
+  })
+  await page.goto('/')
+
+  const sanitized = await page.evaluate(async () => {
+    const modulePath = '/@fs/workspace/packages/markdown/src/mermaid/svg-sanitizer.ts'
+    const sanitizer = await import(/* @vite-ignore */ modulePath) as {
+      sanitizeMermaidSvg: (source: string) => string
+    }
+    const host = document.createElement('div')
+    host.innerHTML = sanitizer.sanitizeMermaidSvg(String.raw`
+      <svg viewBox="0 0 10 10">
+        <style>.node { fill: u\\72l(https://attacker.invalid/style.svg); }</style>
+        <path fill="u\\72l(https://attacker.invalid/paint.svg)" d="M0 0L1 1" />
+      </svg>
+    `)
+    document.body.append(host)
+    return host.innerHTML
+  })
+
+  await page.waitForTimeout(100)
+  expect(sanitized).toContain('<path')
+  expect(sanitized).not.toMatch(/<style|attacker\.invalid|u\\72l/i)
+  expect(offOriginRequests).toEqual([])
+})

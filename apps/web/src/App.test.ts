@@ -1,6 +1,12 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import App from './App.vue'
+
+vi.mock('./mermaid/MermaidSandbox', () => ({
+  getMermaidSandbox: async () => ({
+    render: async (source: string) => `<svg role="img"><text>${source.trim()}</text></svg>`,
+  }),
+}))
 
 describe('Stage 0 proof screen', () => {
   it('presents the required web and desktop proof gates', () => {
@@ -48,6 +54,40 @@ describe('Stage 0 proof screen', () => {
       expect(wrapper.get('[data-testid="rendered-preview"]').html()).toContain(
         '<h1>Updated preview</h1>',
       )
+    } finally {
+      wrapper.unmount()
+      vi.useRealTimers()
+    }
+  })
+
+  it('renders multiple Mermaid blocks at their source positions without pending placeholders', async () => {
+    vi.useFakeTimers()
+    const wrapper = mount(App)
+
+    try {
+      await wrapper.get('[data-testid="markdown-source"]').setValue(`Before
+
+\`\`\`mermaid
+first-diagram
+\`\`\`
+
+Between
+
+\`\`\`mermaid
+second-diagram
+\`\`\`
+
+After`)
+      await vi.advanceTimersByTimeAsync(150)
+      await wrapper.vm.$nextTick()
+      await flushPromises()
+
+      const preview = wrapper.get('[data-testid="rendered-preview"]').text()
+      expect(preview.indexOf('Before')).toBeLessThan(preview.indexOf('first-diagram'))
+      expect(preview.indexOf('first-diagram')).toBeLessThan(preview.indexOf('Between'))
+      expect(preview.indexOf('Between')).toBeLessThan(preview.indexOf('second-diagram'))
+      expect(preview.indexOf('second-diagram')).toBeLessThan(preview.indexOf('After'))
+      expect(preview).not.toContain('Mermaid rendering is pending')
     } finally {
       wrapper.unmount()
       vi.useRealTimers()
