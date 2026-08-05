@@ -4,6 +4,7 @@ import { createApp, nextTick, onBeforeUnmount, onMounted, useTemplateRef, watch,
 import MermaidBlock from './mermaid/MermaidBlock.vue'
 
 const props = defineProps<{ rendered: RenderedMarkdown }>()
+const emit = defineEmits<{ 'mermaid-rendered': [id: string, svg: string] }>()
 const preview = useTemplateRef('preview')
 let childApps: App[] = []
 let generation = 0
@@ -31,7 +32,10 @@ async function mountMermaidBlocks(): Promise<void> {
     if (!placeholder) return
     placeholder.removeAttribute('role')
     placeholder.classList.remove('mermaid-placeholder')
-    const app = createApp(MermaidBlock, { source: block.source })
+    const app = createApp(MermaidBlock, {
+      source: block.source,
+      onRendered: (svg: string) => emit('mermaid-rendered', block.id, svg),
+    })
     childApps.push(app)
     app.mount(placeholder)
   })

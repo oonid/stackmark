@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@stackedit/markdown": "workspace:*",
+    "@stackedit/print": "workspace:*",
+    "katex": "0.18.1",
     "mermaid": "11.16.0",
     "vue": "3.5.40"
   },

@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { getMermaidSandbox } from './MermaidSandbox'
 
 const props = defineProps<{ source: string }>()
+const emit = defineEmits<{ rendered: [svg: string] }>()
 const svg = ref('')
 const error = ref('')
 let generation = 0
@@ -14,7 +15,10 @@ async function render(): Promise<void> {
   error.value = ''
   try {
     const rendered = await (await getMermaidSandbox()).render(source)
-    if (currentGeneration === generation) svg.value = rendered
+    if (currentGeneration === generation) {
+      svg.value = rendered
+      emit('rendered', rendered)
+    }
   } catch (cause) {
     if (currentGeneration === generation) {
       error.value = cause instanceof Error ? cause.message : 'Mermaid rendering failed.'

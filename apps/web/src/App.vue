@@ -2,10 +2,12 @@
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { renderMarkdown } from '@stackedit/markdown'
 import MarkdownPreview from './MarkdownPreview.vue'
+import PrintProof from './print/PrintProof.vue'
 import initialMarkdown from '../../../tests/fixtures/print-proof.md?raw'
 
 const markdownSource = ref(initialMarkdown)
 const renderedMarkdown = ref(renderMarkdown(markdownSource.value))
+const mermaidSvg = ref<Record<string, string>>({})
 let renderTimer: ReturnType<typeof window.setTimeout> | undefined
 
 watch(markdownSource, (source) => {
@@ -14,6 +16,7 @@ watch(markdownSource, (source) => {
   }
   renderTimer = window.setTimeout(() => {
     renderedMarkdown.value = renderMarkdown(source)
+    mermaidSvg.value = {}
   }, 150)
 })
 
@@ -26,6 +29,12 @@ onBeforeUnmount(() => {
 function printProof(): void {
   window.print()
 }
+
+function recordMermaidSvg(id: string, svg: string): void {
+  mermaidSvg.value = { ...mermaidSvg.value, [id]: svg }
+}
+
+const forcePrintFallback = new URLSearchParams(window.location.search).has('printFallback')
 </script>
 
 <template>
@@ -50,7 +59,7 @@ function printProof(): void {
       <section class="proof-card" aria-labelledby="preview-heading">
         <h2 id="preview-heading">Preview</h2>
         <article data-testid="rendered-preview" class="preview-panel">
-          <MarkdownPreview :rendered="renderedMarkdown" />
+          <MarkdownPreview :rendered="renderedMarkdown" @mermaid-rendered="recordMermaidSvg" />
         </article>
       </section>
 
@@ -60,8 +69,13 @@ function printProof(): void {
         <button type="button" disabled>Choose folder in desktop app</button>
       </section>
 
-      <section class="proof-card" aria-labelledby="print-proof-heading">
-        <h2 id="print-proof-heading">Print proof</h2>
+      <PrintProof
+        :rendered="renderedMarkdown"
+        :mermaid-svg="mermaidSvg"
+        :force-fallback="forcePrintFallback"
+      />
+
+      <section class="proof-card print-action-card" aria-label="Print action">
         <p>Use the browser print dialog to prove the shared output path.</p>
         <button type="button" data-testid="print-proof" @click="printProof">Print proof</button>
       </section>

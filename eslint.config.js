@@ -21,6 +21,10 @@ module.exports = tseslint.config(
     languageOptions: {
       globals: {
         window: 'readonly',
+        document: 'readonly',
+        DOMParser: 'readonly',
+        HTMLElement: 'readonly',
+        URLSearchParams: 'readonly',
       },
       parserOptions: {
         parser: tseslint.parser,
