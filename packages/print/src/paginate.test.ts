@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_PRINT_SETTINGS,
   awaitPrintResources,
@@ -64,7 +64,7 @@ describe('pagination adapter', () => {
 
     const result = await paginate({
       document,
-      source: {} as HTMLElement,
+      source: globalThis.document.createElement('article'),
       target,
       timeoutMs: 1,
       preview: async () => new Promise(() => undefined),
@@ -73,6 +73,69 @@ describe('pagination adapter', () => {
     expect(result.mode).toBe('plain-css')
     expect(result.pageCount).toBe(0)
     expect(result.warnings).toEqual([{ code: 'PAGEDJS_TIMEOUT', message: 'Paged.js pagination timed out; using plain CSS.' }])
+  })
+
+  it('returns the typed fallback when a readiness step rejects', async () => {
+    const document = {
+      fonts: { ready: Promise.reject(new Error('font load failed')) },
+      querySelectorAll: () => [],
+    } as unknown as Document
+    const target = { classList: { add: () => undefined } } as unknown as HTMLElement
+
+    await expect(paginate({
+      document,
+      source: globalThis.document.createElement('article'),
+      target,
+      preview: async () => ({ total: 2 }),
+    })).resolves.toEqual({
+      mode: 'plain-css',
+      pageCount: 0,
+      warnings: [{ code: 'PAGEDJS_FAILED', message: 'Paged.js pagination failed (font load failed); using plain CSS.' }],
+    })
+  })
+
+  it('times out stalled resource readiness before preview starts', async () => {
+    const document = {
+      fonts: { ready: new Promise(() => undefined) },
+    } as unknown as Document
+    const preview = vi.fn(async () => ({ total: 2 }))
+
+    const result = await paginate({
+      document,
+      source: globalThis.document.createElement('article'),
+      target: globalThis.document.createElement('div'),
+      timeoutMs: 1,
+      preview,
+    })
+
+    expect(result).toEqual({
+      mode: 'plain-css',
+      pageCount: 0,
+      warnings: [{ code: 'PAGEDJS_TIMEOUT', message: 'Paged.js pagination timed out; using plain CSS.' }],
+    })
+    expect(preview).not.toHaveBeenCalled()
+  })
+
+  it('does not wait for incomplete images outside the print source', async () => {
+    const outsideImage = {
+      complete: false,
+      addEventListener: () => undefined,
+    }
+    const document = {
+      fonts: { ready: Promise.resolve() },
+      querySelectorAll: () => [outsideImage],
+    } as unknown as Document
+    const source = Object.assign(globalThis.document.createElement('article'), {
+      querySelectorAll: () => [],
+    })
+    const target = {} as HTMLElement
+
+    const result = await Promise.race([
+      paginate({ document, source, target, preview: async () => ({ total: 2 }) }),
+      new Promise<'still waiting'>((resolve) => window.setTimeout(() => resolve('still waiting'), 25)),
+    ])
+
+    expect(result).toEqual({ mode: 'pagedjs', pageCount: 2, warnings: [] })
   })
 
   it('waits for font and image completion before pagination', async () => {
@@ -92,7 +155,8 @@ describe('pagination adapter', () => {
       querySelectorAll: () => [image],
     } as unknown as Document
 
-    await awaitPrintResources(document)
+    const source = { querySelectorAll: () => [image] } as unknown as HTMLElement
+    await awaitPrintResources(source, document)
 
     expect(events).toEqual(expect.arrayContaining(['fonts', 'load', 'error']))
   })

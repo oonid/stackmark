@@ -13,38 +13,62 @@ const props = defineProps<{
 const printSource = useTemplateRef('printSource')
 const pagedTarget = useTemplateRef('pagedTarget')
 const printDocument = useTemplateRef('printDocument')
+const stagingHost = useTemplateRef('stagingHost')
 const status = ref('Preparing printable document…')
+const paginationState = ref<'preparing' | 'pagedjs' | 'plain-css'>('preparing')
 let generation = 0
+const stagingNodes = new Set<HTMLElement>()
 
 const printableHtml = computed(() => hydrateStaticPrintHtml(props.rendered.html, props.mermaidSvg))
 
 watch(printableHtml, () => { void paginateDocument() }, { flush: 'post', immediate: true })
 
-onBeforeUnmount(() => { generation += 1 })
+onBeforeUnmount(() => {
+  generation += 1
+  stagingNodes.forEach((node) => node.remove())
+  stagingNodes.clear()
+})
 
 async function paginateDocument(): Promise<void> {
   const currentGeneration = ++generation
   await nextTick()
-  if (!printSource.value || !pagedTarget.value || !printDocument.value) return
+  if (!printSource.value || !pagedTarget.value || !printDocument.value || !stagingHost.value) return
 
-  pagedTarget.value.replaceChildren()
-  printDocument.value.classList.remove('pagedjs-failed')
+  const detachedSource = printSource.value.cloneNode(true) as HTMLElement
+  const detachedTarget = document.createElement('div')
+  stagingNodes.add(detachedSource)
+  stagingNodes.add(detachedTarget)
+  stagingHost.value.append(detachedSource, detachedTarget)
   status.value = 'Preparing printable document…'
+  paginationState.value = 'preparing'
   const result = await paginate({
     document,
-    source: printSource.value,
-    target: pagedTarget.value,
+    source: detachedSource,
+    target: detachedTarget,
     waitForKatex: async () => { await document.fonts?.ready },
     waitForMermaid: async () => { await waitForStaticMermaid() },
     preview: props.forceFallback ? async () => new Promise(() => undefined) : undefined,
     timeoutMs: props.forceFallback ? 1 : 10_000,
   })
-  if (currentGeneration !== generation || !pagedTarget.value) return
+  stagingNodes.delete(detachedSource)
+  stagingNodes.delete(detachedTarget)
+  if (currentGeneration !== generation || !pagedTarget.value) {
+    detachedSource.remove()
+    detachedTarget.remove()
+    return
+  }
 
-  if (result.mode === 'plain-css') printDocument.value.classList.add('pagedjs-failed')
-  pagedTarget.value.querySelectorAll('.pagedjs_page').forEach((page, index) => {
-    page.setAttribute('data-page-number', String(index + 1))
-  })
+  if (result.mode === 'pagedjs') {
+    pagedTarget.value.replaceChildren(...Array.from(detachedTarget.childNodes))
+    pagedTarget.value.querySelectorAll('.pagedjs_page').forEach((page, index) => {
+      page.setAttribute('data-preview-page-number', String(index + 1))
+    })
+  } else {
+    pagedTarget.value.replaceChildren()
+  }
+  detachedSource.remove()
+  detachedTarget.remove()
+  paginationState.value = result.mode
   status.value = result.mode === 'pagedjs'
     ? `${result.pageCount} pages ready for printing.`
     : `Using plain CSS fallback: ${result.warnings[0]?.message}`
@@ -85,11 +109,16 @@ function hydrateStaticPrintHtml(html: string, mermaidSvg: Readonly<Record<string
       ref="printDocument"
       data-testid="print-document"
       class="stackedit-print-document"
+      :class="{
+        'pagedjs-ready': paginationState === 'pagedjs',
+        'pagedjs-failed': paginationState === 'plain-css',
+      }"
       :data-page-size="DEFAULT_PRINT_SETTINGS.pageSize"
     >
       <!-- eslint-disable vue/no-v-html -- only sanitized Markdown and separately sanitized static Mermaid SVG enter here. -->
       <div ref="printSource" class="print-source stackedit-print-document" v-html="printableHtml" />
       <div ref="pagedTarget" class="paged-output" aria-label="Paginated print pages" />
     </article>
+    <div ref="stagingHost" class="pagination-staging" aria-hidden="true" />
   </section>
 </template>

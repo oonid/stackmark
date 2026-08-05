@@ -60,8 +60,8 @@ export function printPolicy(settings: PrintSettings): PrintPolicy {
   return printPolicyValue
 }
 
-export async function awaitPrintResources(document: Document): Promise<void> {
-  const images = Array.from(document.querySelectorAll('img'))
+export async function awaitPrintResources(source: HTMLElement, document: Document): Promise<void> {
+  const images = Array.from(source.querySelectorAll('img'))
   await Promise.all([
     document.fonts?.ready ?? Promise.resolve(),
     ...images.map((image) => awaitImage(image)),
@@ -69,14 +69,14 @@ export async function awaitPrintResources(document: Document): Promise<void> {
 }
 
 export async function paginate(options: PaginateOptions): Promise<PaginationResult> {
-  await awaitPrintResources(options.document)
-  await options.waitForKatex?.()
-  await options.waitForMermaid?.()
-
   const timeoutMs = options.timeoutMs ?? 10_000
   try {
-    const flow = await withTimeout(
-      options.preview ? options.preview(options.source, options.target) : previewPaged(options.source, options.target),
+    const flow = await withTimeout(async () => {
+      await awaitPrintResources(options.source, options.document)
+      await options.waitForKatex?.()
+      await options.waitForMermaid?.()
+      return options.preview ? options.preview(options.source, options.target) : previewPaged(options.source, options.target)
+    },
       timeoutMs,
     )
     return { mode: 'pagedjs', pageCount: flow.total ?? countPages(options.target), warnings: [] }
@@ -90,7 +90,7 @@ export async function paginate(options: PaginateOptions): Promise<PaginationResu
         code: timedOut ? 'PAGEDJS_TIMEOUT' : 'PAGEDJS_FAILED',
         message: timedOut
           ? 'Paged.js pagination timed out; using plain CSS.'
-          : 'Paged.js pagination failed; using plain CSS.',
+          : `Paged.js pagination failed (${cause instanceof Error ? cause.message : 'unknown error'}); using plain CSS.`,
       }],
     }
   }
@@ -115,10 +115,10 @@ function awaitImage(image: HTMLImageElement): Promise<void> {
 
 class PaginationTimeoutError extends Error {}
 
-function withTimeout<T>(operation: Promise<T>, timeoutMs: number): Promise<T> {
+function withTimeout<T>(operation: () => Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = window.setTimeout(() => reject(new PaginationTimeoutError()), timeoutMs)
-    operation.then(
+    operation().then(
       (value) => { window.clearTimeout(timer); resolve(value) },
       (error: unknown) => { window.clearTimeout(timer); reject(error) },
     )
