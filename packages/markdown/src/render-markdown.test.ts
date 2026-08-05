@@ -53,14 +53,31 @@ const proof = true
   it('extracts Mermaid fences without retaining their source in returned HTML', () => {
     const result = renderMarkdown('```mermaid\nflowchart TD\n  A --> B\n```')
 
-    expect(result.mermaidBlocks).toEqual([
-      { id: 'mermaid-1', source: 'flowchart TD\n  A --> B\n' },
-    ])
-    expect(result.html).toContain('data-mermaid-placeholder="mermaid-1"')
+    expect(result.mermaidBlocks).toHaveLength(1)
+    expect(result.mermaidBlocks[0].id).toMatch(
+      /^mermaid-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    )
+    expect(result.mermaidBlocks[0].source).toBe('flowchart TD\n  A --> B\n')
+    expect(result.html).toContain(`data-mermaid-placeholder="${result.mermaidBlocks[0].id}"`)
     expect(result.html).not.toContain('flowchart TD')
     expect(result.html).toContain('Mermaid rendering is pending')
     expect(result.warnings).toEqual([
       { code: 'MERMAID_PENDING', message: 'Mermaid rendering is pending.' },
     ])
+  })
+
+  it('uses an unguessable marker that cannot collide with a user-authored predictable placeholder', () => {
+    const result = renderMarkdown([
+      '<div data-mermaid-placeholder="mermaid-1">spoof</div>',
+      '',
+      '```mermaid',
+      'flowchart TD',
+      '  A --> B',
+      '```',
+    ].join('\n'))
+
+    expect(result.mermaidBlocks).toHaveLength(1)
+    expect(result.mermaidBlocks[0].id).not.toBe('mermaid-1')
+    expect(result.html.match(/data-mermaid-placeholder=/g)).toHaveLength(2)
   })
 })

@@ -19,12 +19,16 @@ async function mountMermaidBlocks(): Promise<void> {
   await nextTick()
   if (currentGeneration !== generation || !preview.value) return
 
-  const blocks = new Map(props.rendered.mermaidBlocks.map((block) => [block.id, block]))
-  preview.value.querySelectorAll('[data-mermaid-placeholder]').forEach((placeholder) => {
+  const placeholderElements = preview.value.querySelectorAll('[data-mermaid-placeholder]')
+  const placeholders = new Map<string, (typeof placeholderElements)[number]>()
+  placeholderElements.forEach((placeholder) => {
     const id = placeholder.getAttribute('data-mermaid-placeholder')
-    const block = id ? blocks.get(id) : undefined
-    if (!block) return
+    if (id && !placeholders.has(id)) placeholders.set(id, placeholder)
+  })
 
+  props.rendered.mermaidBlocks.forEach((block) => {
+    const placeholder = placeholders.get(block.id)
+    if (!placeholder) return
     placeholder.removeAttribute('role')
     placeholder.classList.remove('mermaid-placeholder')
     const app = createApp(MermaidBlock, { source: block.source })

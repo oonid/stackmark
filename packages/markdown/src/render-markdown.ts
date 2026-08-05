@@ -100,7 +100,7 @@ function createMarkdownRenderer(): MarkdownIt {
     }
 
     const context = environment as RenderEnvironment
-    const id = `mermaid-${context.mermaidBlocks.length + 1}`
+    const id = `mermaid-${crypto.randomUUID()}`
     context.mermaidBlocks.push({ id, source: token.content })
     context.warnings.push({ code: 'MERMAID_PENDING', message: mermaidWarning })
     return `<div data-mermaid-placeholder="${id}" class="mermaid-placeholder" role="status">${mermaidWarning}</div>\n`

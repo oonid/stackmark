@@ -2,9 +2,13 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import App from './App.vue'
 
+const { renderMermaid } = vi.hoisted(() => ({
+  renderMermaid: vi.fn(async (source: string) => `<svg role="img"><text>${source.trim()}</text></svg>`),
+}))
+
 vi.mock('./mermaid/MermaidSandbox', () => ({
   getMermaidSandbox: async () => ({
-    render: async (source: string) => `<svg role="img"><text>${source.trim()}</text></svg>`,
+    render: renderMermaid,
   }),
 }))
 
@@ -88,6 +92,34 @@ After`)
       expect(preview.indexOf('Between')).toBeLessThan(preview.indexOf('second-diagram'))
       expect(preview.indexOf('second-diagram')).toBeLessThan(preview.indexOf('After'))
       expect(preview).not.toContain('Mermaid rendering is pending')
+    } finally {
+      wrapper.unmount()
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not mount a diagram into a user-authored predictable placeholder', async () => {
+    vi.useFakeTimers()
+    const wrapper = mount(App)
+
+    try {
+      await flushPromises()
+      renderMermaid.mockClear()
+      await wrapper.get('[data-testid="markdown-source"]').setValue([
+        '<div data-mermaid-placeholder="mermaid-1">spoof</div>',
+        '',
+        '```mermaid',
+        'actual-diagram',
+        '```',
+      ].join('\n'))
+      await vi.advanceTimersByTimeAsync(150)
+      await wrapper.vm.$nextTick()
+      await flushPromises()
+
+      expect(renderMermaid).toHaveBeenCalledOnce()
+      expect(renderMermaid).toHaveBeenCalledWith('actual-diagram\n')
+      const preview = wrapper.get('[data-testid="rendered-preview"]').text()
+      expect(preview.indexOf('spoof')).toBeLessThan(preview.indexOf('actual-diagram'))
     } finally {
       wrapper.unmount()
       vi.useRealTimers()
