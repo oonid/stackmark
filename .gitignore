@@ -1,6 +1,9 @@
 .DS_Store
 node_modules/
+.pnpm-store/
 dist/
+target/
+apps/desktop/src-tauri/gen/
 apps/web/public/generated/
 apps/web/test-results/
 apps/web/playwright-report/

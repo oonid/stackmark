@@ -1,0 +1,19 @@
+[[permission]]
+identifier = "allow-set-workspace-root"
+description = "Allows the main window to set the canonical Markdown workspace root."
+commands.allow = ["set_workspace_root"]
+
+[[permission]]
+identifier = "allow-read-markdown"
+description = "Allows the main window to read a validated Markdown path under the workspace root."
+commands.allow = ["read_markdown"]
+
+[[permission]]
+identifier = "allow-atomic-write-markdown"
+description = "Allows the main window to atomically replace a validated Markdown path under the workspace root."
+commands.allow = ["atomic_write_markdown"]
+
+[[permission]]
+identifier = "allow-start-workspace-watch"
+description = "Allows the main window to start the scoped Markdown workspace watcher."
+commands.allow = ["start_workspace_watch"]

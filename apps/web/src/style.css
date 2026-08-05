@@ -104,3 +104,21 @@ textarea {
 .preview-panel pre {
   white-space: pre-wrap;
 }
+
+.proof-metadata {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.35rem 0.75rem;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.proof-metadata dt {
+  font-weight: 700;
+}
+
+.proof-metadata dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}

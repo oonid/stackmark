@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "Narrow capabilities for the Stage 0 main application window.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dialog:allow-open",
+    "allow-set-workspace-root",
+    "allow-read-markdown",
+    "allow-atomic-write-markdown",
+    "allow-start-workspace-watch"
+  ]
+}

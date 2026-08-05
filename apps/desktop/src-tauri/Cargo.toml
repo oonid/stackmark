@@ -1,0 +1,24 @@
+[package]
+name = "stackedit-desktop"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "stackedit_desktop"
+path = "src/lib.rs"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.6.3", features = [] }
+
+[dependencies]
+notify = "=8.2.0"
+serde = { version = "=1.0.228", features = ["derive"] }
+sha2 = "=0.10.9"
+tempfile = "=3.20.0"
+thiserror = "=2.0.16"
+tauri = { version = "=2.11.5", features = [] }
+tauri-plugin-dialog = "=2.7.2"
+
+[dev-dependencies]
+tempfile = "=3.20.0"

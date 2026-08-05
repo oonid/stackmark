@@ -8,6 +8,7 @@ module.exports = tseslint.config(
       '**/dist/**',
       'apps/web/public/generated/**',
       '**/node_modules/**',
+      '**/target/**',
       'build/*.js',
       'config/*.js',
       'src/libs/*.js',

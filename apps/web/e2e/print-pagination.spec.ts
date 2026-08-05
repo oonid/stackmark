@@ -105,3 +105,27 @@ test('prints the native plain-CSS source exactly once when screen pagination suc
   expect(pdf.byteLength).toBeGreaterThan(10_000)
   expect(pdf.toString('latin1').match(/\/Type\s*\/Page\b/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
 })
+
+test('prints sanitized Mermaid with explicit light-paper colors in dark mode', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await page.goto('/')
+  await expect(page.getByTestId('print-pagination-status')).toContainText(/pages ready/i)
+  await page.emulateMedia({ colorScheme: 'dark', media: 'print' })
+
+  const printSource = page
+    .getByTestId('print-document')
+    .locator(':scope > .print-source')
+  const node = printSource.locator('.mermaid-static .node rect').first()
+  const edge = printSource.locator('.mermaid-static .flowchart-link').first()
+  const arrow = printSource.locator('.mermaid-static marker path').first()
+
+  await expect(node).toBeVisible()
+  expect(await node.evaluate((element) => {
+    const style = getComputedStyle(element)
+    return { fill: style.fill, stroke: style.stroke }
+  })).toEqual({ fill: 'rgb(248, 250, 252)', stroke: 'rgb(71, 85, 105)' })
+  expect(await edge.evaluate((element) => getComputedStyle(element).stroke))
+    .toBe('rgb(71, 85, 105)')
+  expect(await arrow.evaluate((element) => getComputedStyle(element).fill))
+    .toBe('rgb(71, 85, 105)')
+})

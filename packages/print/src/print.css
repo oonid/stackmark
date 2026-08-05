@@ -85,6 +85,55 @@
   max-height: 240mm;
 }
 
+.stackedit-print-document .mermaid-static svg {
+  color-scheme: light;
+  background: #fff;
+  forced-color-adjust: none;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.stackedit-print-document .mermaid-static text {
+  fill: #1f2937;
+  stroke: none;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+}
+
+.stackedit-print-document .mermaid-static .node rect,
+.stackedit-print-document .mermaid-static .node circle,
+.stackedit-print-document .mermaid-static .node ellipse,
+.stackedit-print-document .mermaid-static .node polygon,
+.stackedit-print-document .mermaid-static .actor,
+.stackedit-print-document .mermaid-static .entityBox {
+  fill: #f8fafc;
+  stroke: #475569;
+}
+
+.stackedit-print-document .mermaid-static .cluster rect {
+  fill: #f1f5f9;
+  stroke: #64748b;
+}
+
+.stackedit-print-document .mermaid-static .edgeLabel rect,
+.stackedit-print-document .mermaid-static .labelBkg {
+  fill: #fff;
+}
+
+.stackedit-print-document .mermaid-static .edgePath path,
+.stackedit-print-document .mermaid-static .flowchart-link,
+.stackedit-print-document .mermaid-static .messageLine0,
+.stackedit-print-document .mermaid-static .messageLine1,
+.stackedit-print-document .mermaid-static .relationshipLine {
+  fill: none;
+  stroke: #475569;
+}
+
+.stackedit-print-document .mermaid-static marker path {
+  fill: #475569;
+  stroke: #475569;
+}
+
 .stackedit-print-document pre,
 .stackedit-print-document code {
   overflow-wrap: anywhere;
