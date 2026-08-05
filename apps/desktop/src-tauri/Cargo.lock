@@ -2911,6 +2911,7 @@ name = "stackedit-desktop"
 version = "0.1.0"
 dependencies = [
  "notify",
+ "rustix",
  "serde",
  "sha2",
  "tauri",

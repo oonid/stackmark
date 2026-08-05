@@ -5,27 +5,25 @@ import {
   type MermaidRenderRequest,
 } from '@stackedit/markdown/mermaid/protocol'
 
-const CSP = "default-src 'none'; script-src 'unsafe-inline'; img-src data:; style-src 'unsafe-inline'; font-src data:; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'"
-
 export class MermaidSandbox {
   private readonly frame: HTMLIFrameElement
   private readonly ready: Promise<void>
   private readonly pending = new Map<string, { resolve: (svg: string) => void; reject: (error: Error) => void; timer: number }>()
 
-  private constructor(bundle: string) {
+  private constructor() {
     this.frame = document.createElement('iframe')
-    this.frame.hidden = true
+    this.frame.setAttribute('aria-hidden', 'true')
+    this.frame.tabIndex = -1
+    this.frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:1024px;height:768px;border:0;opacity:0;pointer-events:none'
     this.frame.setAttribute('sandbox', 'allow-scripts')
-    this.frame.srcdoc = `<!doctype html><meta http-equiv="Content-Security-Policy" content="${CSP}"><script>${bundle.replaceAll('</script', '<\\/script')}</script>`
+    this.frame.src = '/generated/mermaid-renderer.html'
     this.ready = new Promise((resolve) => this.frame.addEventListener('load', () => resolve(), { once: true }))
     window.addEventListener('message', this.receive)
     document.body.append(this.frame)
   }
 
   static async create(): Promise<MermaidSandbox> {
-    const response = await fetch('/generated/mermaid-renderer.iife.js', { credentials: 'same-origin' })
-    if (!response.ok) throw new Error(`Mermaid renderer unavailable (${response.status}).`)
-    return new MermaidSandbox(await response.text())
+    return new MermaidSandbox()
   }
 
   async render(source: string, theme: MermaidRenderRequest['theme'] = 'default'): Promise<string> {

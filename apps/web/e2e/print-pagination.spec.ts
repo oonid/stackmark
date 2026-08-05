@@ -1,11 +1,18 @@
 import { expect, test } from '@playwright/test'
 
 test('paginates sanitized proof content and records screen-preview page metadata', async ({ page }) => {
+  await page.setViewportSize({ width: 1180, height: 820 })
   await page.goto('/')
 
   await expect(page.getByTestId('print-pagination-status')).toHaveText(/2 pages|ready/i)
   const pages = page.getByTestId('print-document').locator('.pagedjs_page')
-  expect(await pages.count()).toBeGreaterThanOrEqual(2)
+  const visibleTextLengths = await pages.evaluateAll((elements) => elements.map((element) => {
+    const content = element.querySelector<HTMLElement>('.pagedjs_page_content')
+    const text = content?.innerText.replace(/\s+/g, ' ').trim() ?? ''
+    return text.length
+  }))
+  await expect(pages).toHaveCount(2)
+  expect(visibleTextLengths.every((length) => length >= 100)).toBe(true)
   expect(await pages.evaluateAll((elements) => elements.map((element) => Number(element.getAttribute('data-preview-page-number')))))
     .toEqual(Array.from({ length: await pages.count() }, (_, index) => index + 1))
   const overflowingPages = await pages.evaluateAll((elements) => elements.flatMap((element, index) => {
@@ -58,8 +65,27 @@ test('paginates sanitized proof content and records screen-preview page metadata
     }]
   }))
   expect(overflowingPages).toEqual([])
+  const previewContainment = await page.getByTestId('print-document').evaluate((documentElement) => {
+    const card = documentElement.closest<HTMLElement>('.print-proof-card')!
+    const output = documentElement.querySelector<HTMLElement>(':scope > .paged-output')!
+    const page = documentElement.querySelector<HTMLElement>('.pagedjs_page')!
+    const cardBox = card.getBoundingClientRect()
+    const pageBox = page.getBoundingClientRect()
+    return {
+      cardLeft: cardBox.left,
+      cardRight: cardBox.right,
+      pageLeft: pageBox.left,
+      pageRight: pageBox.right,
+      overflowX: getComputedStyle(output).overflowX,
+    }
+  })
+  expect(previewContainment.pageLeft).toBeGreaterThanOrEqual(previewContainment.cardLeft)
+  expect(previewContainment.pageRight).toBeLessThanOrEqual(previewContainment.cardRight)
+  expect(previewContainment.overflowX).toBe('auto')
   await expect(pages.locator('.katex').first()).toBeVisible()
-  await expect(pages.locator('.mermaid-static svg').first()).toBeVisible()
+  const pagedDiagram = pages.locator('.mermaid-static img[alt="Mermaid diagram"]').first()
+  await expect(pagedDiagram).toBeVisible()
+  await expect(pagedDiagram).toHaveAttribute('src', /^data:image\/svg\+xml/)
   await pages.first().screenshot({ path: 'test-results/print/pagedjs-page-1.png' })
 })
 
@@ -128,4 +154,30 @@ test('prints sanitized Mermaid with explicit light-paper colors in dark mode', a
     .toBe('rgb(71, 85, 105)')
   expect(await arrow.evaluate((element) => getComputedStyle(element).fill))
     .toBe('rgb(71, 85, 105)')
+})
+
+test('keeps the simple Mermaid proof centered within a readable print width', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByTestId('print-pagination-status')).toContainText(/pages ready/i)
+  await page.emulateMedia({ media: 'print' })
+
+  const diagram = page
+    .getByTestId('print-document')
+    .locator(':scope > .print-source .mermaid-static svg')
+    .first()
+  await expect(diagram).toBeVisible()
+  const layout = await diagram.evaluate((element) => {
+    const box = element.getBoundingClientRect()
+    const parent = element.parentElement!.getBoundingClientRect()
+    const viewBoxWidth = element.viewBox.baseVal.width
+    return {
+      width: box.width,
+      expectedNaturalWidth: Math.min(viewBoxWidth, parent.width),
+      centeredWithinOnePixel: Math.abs(box.left - (parent.left + (parent.width - box.width) / 2)) <= 1,
+    }
+  })
+
+  expect(layout.expectedNaturalWidth).toBeGreaterThan(0)
+  expect(layout.width).toBeCloseTo(layout.expectedNaturalWidth, 0)
+  expect(layout.centeredWithinOnePixel).toBe(true)
 })

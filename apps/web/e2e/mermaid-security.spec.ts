@@ -26,13 +26,33 @@ test('renders Mermaid as inert sanitized SVG in an opaque sandbox', async ({ pag
 
   const frame = page.frames().find((candidate) => candidate !== page.mainFrame())
   expect(frame).toBeTruthy()
-  expect(await frame!.evaluate(() => location.origin)).toBe('null')
+  expect(await frameElement.evaluate((element) => (element as HTMLIFrameElement).contentDocument)).toBeNull()
+  expect(await frame!.evaluate(() => {
+    try {
+      void window.parent.document
+      return false
+    } catch {
+      return true
+    }
+  })).toBe(true)
 
   const diagram = page.getByTestId('mermaid-static').locator('svg')
   await expect(diagram).toBeVisible()
   const svg = await diagram.evaluate((element) => element.outerHTML)
+  const geometry = await diagram.evaluate((element) => {
+    const viewBox = element.viewBox.baseVal
+    const content = element.getBBox()
+    return {
+      viewBox: { x: viewBox.x, y: viewBox.y, width: viewBox.width, height: viewBox.height },
+      content: { x: content.x, y: content.y, width: content.width, height: content.height },
+    }
+  })
   expect(svg).not.toMatch(/<script|foreignObject|\son\w+=|javascript:|(?:href|src)=["']https?:|url\(\s*https?:|@import/i)
   expect(svg).toContain('role="img"')
+  expect(geometry.content.x).toBeGreaterThanOrEqual(geometry.viewBox.x)
+  expect(geometry.content.y).toBeGreaterThanOrEqual(geometry.viewBox.y)
+  expect(geometry.content.x + geometry.content.width).toBeLessThanOrEqual(geometry.viewBox.x + geometry.viewBox.width)
+  expect(geometry.content.y + geometry.content.height).toBeLessThanOrEqual(geometry.viewBox.y + geometry.viewBox.height)
   expect(await page.evaluate(() => (window as Window & { __mermaidSentinel?: string }).__mermaidSentinel)).toBe('safe')
   expect(offOriginRequests).toEqual([])
   expect(dialogs).toEqual([])
@@ -87,4 +107,42 @@ test('rejects CSS-escaped external URLs before SVG enters the parent document', 
   expect(sanitized).toContain('<path')
   expect(sanitized).not.toMatch(/<style|attacker\.invalid|u\\72l/i)
   expect(offOriginRequests).toEqual([])
+})
+
+test('renders from an opaque external sandbox document under the restrictive Tauri parent CSP', async ({ page }) => {
+  const rendererDocument = await page.request.get(
+    'http://127.0.0.1:1420/generated/mermaid-renderer.html',
+  )
+  const rendererHtml = await rendererDocument.text()
+  const nonce = rendererHtml.match(/script-src 'nonce-([^']+)'/)?.[1]
+  expect(nonce).toBeTruthy()
+  expect(rendererHtml).toContain(`<script nonce="${nonce}" src="/generated/mermaid-renderer.iife.js"`)
+
+  await page.route('**/', async (route) => {
+    const response = await route.fetch()
+    await route.fulfill({
+      response,
+      headers: {
+        ...response.headers(),
+        'content-security-policy': "default-src 'self' customprotocol: asset:; connect-src ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src 'self'; object-src 'none'",
+      },
+    })
+  })
+  await page.goto('/')
+
+  const frameElement = page.locator('iframe[sandbox="allow-scripts"]')
+  await expect(frameElement).toHaveAttribute('src', '/generated/mermaid-renderer.html')
+  await expect(frameElement).not.toHaveAttribute('srcdoc', /./)
+  await expect(page.getByTestId('mermaid-static').locator('svg')).toBeVisible()
+  const frame = page.frames().find((candidate) => candidate !== page.mainFrame())
+  expect(frame).toBeTruthy()
+  expect(await frameElement.evaluate((element) => (element as HTMLIFrameElement).contentDocument)).toBeNull()
+  expect(await frame!.evaluate(() => {
+    try {
+      void window.parent.document
+      return false
+    } catch {
+      return true
+    }
+  })).toBe(true)
 })

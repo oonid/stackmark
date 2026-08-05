@@ -170,3 +170,113 @@ fn watcher_suppresses_only_its_matching_write_and_reports_a_later_external_edit(
         "28cb76cc417151cd9d002d623f78b5c8aaf69a4365d46d412e159cf65183a063"
     );
 }
+
+#[cfg(target_os = "linux")]
+#[test]
+fn rejects_a_directory_symlink_swap_between_temporary_write_and_persist() {
+    use std::io::Write;
+    use std::os::unix::fs::symlink;
+
+    let (directory, service) = workspace();
+    let outside = tempdir().expect("outside directory");
+    fs::create_dir(directory.path().join("notes")).expect("workspace directory");
+
+    let result = service.atomic_write_markdown_with("notes/proof.md", |temporary| {
+        temporary.write_all(b"must stay inside workspace")?;
+        fs::rename(
+            directory.path().join("notes"),
+            directory.path().join("notes-moved"),
+        )?;
+        symlink(outside.path(), directory.path().join("notes"))?;
+        Ok(())
+    });
+
+    assert!(result.is_err(), "a swapped parent must abort the save");
+    assert!(
+        !outside.path().join("proof.md").exists(),
+        "persist must never follow the swapped symlink"
+    );
+}
+
+#[test]
+fn watcher_reports_a_same_content_external_save_when_its_mtime_differs() {
+    let (_directory, service) = workspace();
+    let (sender, receiver) = mpsc::channel();
+    let _watch = service
+        .start_workspace_watch(move |event| sender.send(event).expect("event receiver"))
+        .expect("workspace watcher");
+
+    let saved = service
+        .atomic_write_markdown("proof.md", b"same bytes")
+        .expect("service write");
+    let deadline = std::time::Instant::now() + Duration::from_millis(60);
+    let external_mtime = loop {
+        std::thread::sleep(Duration::from_millis(2));
+        fs::write(service.root().join("proof.md"), b"same bytes").expect("same-content edit");
+        let mtime = fs::metadata(service.root().join("proof.md"))
+            .expect("external metadata")
+            .modified()
+            .expect("external mtime")
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("mtime after epoch")
+            .as_millis() as u64;
+        if mtime != saved.mtime_unix_ms || std::time::Instant::now() >= deadline {
+            break mtime;
+        }
+    };
+    assert_ne!(
+        external_mtime, saved.mtime_unix_ms,
+        "fixture must change mtime"
+    );
+
+    let event = receiver
+        .recv_timeout(Duration::from_secs(5))
+        .expect("same-content external event");
+    assert_eq!(event.path, "proof.md");
+    assert_eq!(event.sha256, saved.sha256);
+    assert_eq!(event.mtime_unix_ms, external_mtime);
+}
+
+#[test]
+fn watcher_does_not_report_the_services_own_completed_write() {
+    let (_directory, service) = workspace();
+    let (sender, receiver) = mpsc::channel();
+    let _watch = service
+        .start_workspace_watch(move |event| sender.send(event).expect("event receiver"))
+        .expect("workspace watcher");
+
+    service
+        .atomic_write_markdown("proof.md", b"written by service")
+        .expect("service write");
+
+    assert!(
+        receiver.recv_timeout(Duration::from_millis(400)).is_err(),
+        "the service's own matching write must be suppressed"
+    );
+}
+
+#[test]
+fn watcher_stops_on_drop_and_can_restart_cleanly() {
+    let (_directory, service) = workspace();
+    let (old_sender, old_receiver) = mpsc::channel();
+    let old_watch = service
+        .start_workspace_watch(move |event| old_sender.send(event).expect("old receiver"))
+        .expect("first workspace watcher");
+    drop(old_watch);
+
+    fs::write(service.root().join("after-drop.md"), b"not observed").expect("post-drop edit");
+    assert!(old_receiver
+        .recv_timeout(Duration::from_millis(200))
+        .is_err());
+
+    let (new_sender, new_receiver) = mpsc::channel();
+    let _new_watch = service
+        .start_workspace_watch(move |event| new_sender.send(event).expect("new receiver"))
+        .expect("restarted workspace watcher");
+    fs::write(service.root().join("after-restart.md"), b"observed").expect("restart edit");
+
+    let event = new_receiver
+        .recv_timeout(Duration::from_secs(5))
+        .expect("restarted watcher event");
+    assert_eq!(event.path, "after-restart.md");
+}

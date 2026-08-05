@@ -39,6 +39,7 @@ async function paginateDocument(): Promise<void> {
   stagingNodes.add(detachedSource)
   stagingNodes.add(detachedTarget)
   stagingHost.value.append(detachedSource, detachedTarget)
+  replacePagedMermaidWithAtomicImages(detachedSource)
   status.value = 'Preparing printable document…'
   paginationState.value = 'preparing'
   const result = await paginate({
@@ -74,6 +75,47 @@ async function paginateDocument(): Promise<void> {
     : `Using plain CSS fallback: ${result.warnings[0]?.message}`
 }
 
+const svgPresentationAttributes = [
+  'color',
+  'fill',
+  'fill-opacity',
+  'font-family',
+  'font-size',
+  'font-style',
+  'font-weight',
+  'opacity',
+  'stroke',
+  'stroke-dasharray',
+  'stroke-linecap',
+  'stroke-linejoin',
+  'stroke-opacity',
+  'stroke-width',
+] as const
+
+function replacePagedMermaidWithAtomicImages(source: HTMLElement): void {
+  source.querySelectorAll<SVGSVGElement>('.mermaid-static svg').forEach((svg) => {
+    ;[svg, ...svg.querySelectorAll<SVGElement>('*')].forEach((element) => {
+      const computed = window.getComputedStyle(element)
+      svgPresentationAttributes.forEach((attribute) => {
+        const value = computed.getPropertyValue(attribute)
+        if (value) element.setAttribute(attribute, value)
+      })
+    })
+    svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+
+    const image = document.createElement('img')
+    image.alt = 'Mermaid diagram'
+    image.className = 'mermaid-print-image'
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.outerHTML)}`
+    const viewBox = svg.viewBox.baseVal
+    if (viewBox.width > 0 && viewBox.height > 0) {
+      image.width = viewBox.width
+      image.height = viewBox.height
+    }
+    svg.replaceWith(image)
+  })
+}
+
 async function waitForStaticMermaid(): Promise<void> {
   const expected = props.rendered.mermaidBlocks.map((block) => block.id)
   const deadline = window.performance.now() + 5_000
@@ -95,6 +137,11 @@ function hydrateStaticPrintHtml(html: string, mermaidSvg: Readonly<Record<string
     staticDiagram.className = 'mermaid-static'
     // MermaidSandbox has already returned this value through the distinct SVG sanitizer.
     staticDiagram.innerHTML = svg
+    const svgRoot = staticDiagram.querySelector('svg')
+    const viewBox = svgRoot?.getAttribute('viewBox')?.trim().split(/[\s,]+/).map(Number)
+    if (svgRoot && viewBox?.length === 4 && Number.isFinite(viewBox[2]) && viewBox[2] > 0) {
+      svgRoot.setAttribute('width', String(viewBox[2]))
+    }
     placeholder.replaceWith(staticDiagram)
   })
   return parsed.body.innerHTML

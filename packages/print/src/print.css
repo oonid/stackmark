@@ -13,6 +13,15 @@
   }
 }
 
+.print-proof-card {
+  grid-column: 1 / -1;
+}
+
+.paged-output {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 @media print {
   .proof-header,
   .proof-grid > :not(.print-proof-card) {
@@ -89,6 +98,8 @@
   color-scheme: light;
   background: #fff;
   forced-color-adjust: none;
+  margin-inline: auto;
+  max-width: 150mm;
   print-color-adjust: exact;
   -webkit-print-color-adjust: exact;
 }
