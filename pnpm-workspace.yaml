@@ -4,3 +4,6 @@ packages:
 allowBuilds:
   core-js: false
   es5-ext: false
+
+patchedDependencies:
+  pagedjs@0.4.3: patches/pagedjs@0.4.3.patch

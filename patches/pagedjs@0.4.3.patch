@@ -1,0 +1,51 @@
+--- a/src/chunker/layout.js
++++ b/src/chunker/layout.js
+@@ -407,12 +407,23 @@
+ 						prevNode = prevNode.parentElement;
+ 					}
+ 					renderedNode = findElement(prevNode, rendered);
++					if (!renderedNode) {
++						// Nothing at or before temp has been rendered on this page yet, so
++						// there is no anchor for a break token. Treat it as pending content.
++						return;
++					}
+ 					// Check if temp is the last rendered node at its level.
+ 					if (!temp.nextSibling) {
+ 						// We need to ensure that the previous sibling of temp is fully rendered.
+ 						const renderedNodeFromSource = findElement(renderedNode, source);
++						if (!renderedNodeFromSource) {
++							return;
++						}
+ 						const walker = document.createTreeWalker(renderedNodeFromSource, NodeFilter.SHOW_ELEMENT);
+ 						const lastChildOfRenderedNodeFromSource = walker.lastChild();
++						if (!lastChildOfRenderedNodeFromSource) {
++							return;
++						}
+ 						const lastChildOfRenderedNodeMatchingFromRendered = findElement(lastChildOfRenderedNodeFromSource, rendered);
+ 						// Check if we found that the last child in source
+ 						if (!lastChildOfRenderedNodeMatchingFromRendered) {
+@@ -423,7 +434,11 @@
+ 					}
+ 					// renderedNode is actually the last unbroken box that does not overflow.
+ 					// Break Token is therefore the next sibling of renderedNode within source node.
+-					node = findElement(renderedNode, source).nextSibling;
++					const renderedNodeInSource = findElement(renderedNode, source);
++					if (!renderedNodeInSource) {
++						return;
++					}
++					node = renderedNodeInSource.nextSibling;
+ 					offset = 0;
+ 				} else {
+ 					node = findElement(renderedNode, source);
+@@ -436,6 +451,11 @@
+ 					renderedNode = findElement(prevValidNode(container), rendered);
+ 				}
+ 
++				if (!renderedNode) {
++					// Same as above: no rendered anchor, so no break token yet.
++					return;
++				}
++
+ 				parent = findElement(renderedNode, source);
+ 				index = indexOfTextNode(temp, parent);
+ 				// No seperatation for the first textNode of an element

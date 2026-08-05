@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  pagedjs@0.4.3: 6b09be6cdff364f47309124be533624802e711550c535651476248042375c0de
+
 importers:
 
   .:
@@ -96,7 +99,7 @@ importers:
     dependencies:
       pagedjs:
         specifier: 0.4.3
-        version: 0.4.3
+        version: 0.4.3(patch_hash=6b09be6cdff364f47309124be533624802e711550c535651476248042375c0de)
     devDependencies:
       jsdom:
         specifier: 28.1.0
@@ -3542,7 +3545,7 @@ snapshots:
 
   package-manager-detector@1.8.0: {}
 
-  pagedjs@0.4.3:
+  pagedjs@0.4.3(patch_hash=6b09be6cdff364f47309124be533624802e711550c535651476248042375c0de):
     dependencies:
       '@babel/polyfill': 7.12.1
       '@babel/runtime': 7.29.7

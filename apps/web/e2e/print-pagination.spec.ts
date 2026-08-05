@@ -94,6 +94,12 @@ test('renders screen preview pages at the stylesheet A4 geometry with generated 
   await expect(page.getByTestId('print-pagination-status')).toContainText(/pages ready/i)
 
   const geometry = await page.getByTestId('print-document').evaluate((documentElement) => {
+    const generatedContent = (root: HTMLElement, selector: string) => {
+      const element = root.querySelector<HTMLElement>(selector)
+      if (!element) return ''
+      return getComputedStyle(element, '::after').content.replace(/^"|"$/g, '').trim()
+    }
+
     // Measure a millimetre reference in the live document rather than assuming 96dpi.
     const probe = document.createElement('div')
     probe.style.cssText = 'position:absolute;top:0;left:0;width:210mm;height:297mm;visibility:hidden;pointer-events:none'
@@ -112,8 +118,10 @@ test('renders screen preview pages at the stylesheet A4 geometry with generated 
       sheetHeightMm: sheetBox.height / millimetre,
       contentWidthMm: contentBox.width / millimetre,
       contentHeightMm: contentBox.height / millimetre,
-      runningTitle: documentElement.querySelector<HTMLElement>('.pagedjs_margin-top-center .pagedjs_margin-content')?.textContent?.trim() ?? '',
-      pageCounter: documentElement.querySelector<HTMLElement>('.pagedjs_margin-bottom-center .pagedjs_margin-content')?.textContent?.trim() ?? '',
+      // Paged.js emits margin-box text as generated ::after content, so it is
+      // never present in textContent.
+      runningTitle: generatedContent(documentElement, '.pagedjs_margin-top-center .pagedjs_margin-content'),
+      pageCounter: generatedContent(documentElement, '.pagedjs_margin-bottom-center .pagedjs_margin-content'),
     }
   })
 
@@ -123,9 +131,13 @@ test('renders screen preview pages at the stylesheet A4 geometry with generated 
   // A4 minus the configured 16mm/14mm/18mm margins.
   expect(geometry.contentWidthMm).toBeCloseTo(182, 0)
   expect(geometry.contentHeightMm).toBeCloseTo(263, 0)
-  // Generated margin boxes from the same @page rule.
+  // Generated margin boxes from the same @page rule. Before the stylesheet was
+  // handed to Paged.js these boxes were not generated at all.
   expect(geometry.runningTitle).toBe('StackEdit print proof')
-  expect(geometry.pageCounter).toMatch(/^Page \d+ of \d+$/)
+  // Computed style keeps counter() unresolved, so assert the rule reached the
+  // margin box rather than trying to read the rendered number.
+  expect(geometry.pageCounter).toMatch(/counter\(page\)/)
+  expect(geometry.pageCounter).toMatch(/counter\(pages\)/)
 })
 
 test('falls back to printable plain CSS when pagination is forced to fail', async ({ page }) => {
