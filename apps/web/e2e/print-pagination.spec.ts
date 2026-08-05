@@ -140,6 +140,35 @@ test('renders screen preview pages at the stylesheet A4 geometry with generated 
   expect(geometry.pageCounter).toMatch(/counter\(pages\)/)
 })
 
+test('keeps application shell chrome out of the rebuilt page ancestors', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByTestId('print-pagination-status')).toContainText(/pages ready/i)
+
+  // Paged.js rebuilds a broken node's ancestor chain onto each new page. Those
+  // rebuilt wrappers must not contribute the app shell's screen chrome, or they
+  // consume page space and force extra breaks.
+  const chrome = await page.getByTestId('print-document').evaluate((root) =>
+    Array.from(root.querySelectorAll<HTMLElement>('.pagedjs_page_content .proof-card, .pagedjs_page_content .proof-shell, .pagedjs_page_content .proof-grid'))
+      .map((element) => {
+        const style = getComputedStyle(element)
+        return {
+          tag: element.tagName,
+          minHeight: style.minHeight,
+          padding: style.padding,
+          borderTopWidth: style.borderTopWidth,
+          rowGap: style.rowGap,
+        }
+      })
+      .filter((entry) =>
+        entry.minHeight !== '0px'
+        || entry.padding !== '0px'
+        || entry.borderTopWidth !== '0px'
+        || (entry.rowGap !== 'normal' && entry.rowGap !== '0px'),
+      ))
+
+  expect(chrome).toEqual([])
+})
+
 test('falls back to printable plain CSS when pagination is forced to fail', async ({ page }) => {
   await page.goto('/?printFallback=1')
 

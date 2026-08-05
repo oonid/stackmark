@@ -26,6 +26,39 @@
   pointer-events: none;
 }
 
+/*
+ * Paged.js rebuilds a broken node's ancestor chain onto each new page so that
+ * inherited styling survives the break. Because the pagination staging host
+ * lives inside the application shell, that chain includes the shell's own
+ * wrappers. The rebuilt copies are empty, but they would otherwise contribute
+ * their screen chrome — card min-height, padding, borders, shell padding — to
+ * every page, wasting a large share of each page and forcing extra breaks.
+ *
+ * Nothing inside a rendered page should carry application chrome.
+ */
+.pagedjs_page_content html,
+.pagedjs_page_content body,
+.pagedjs_page_content .proof-shell,
+.pagedjs_page_content .proof-grid,
+.pagedjs_page_content .proof-card,
+.pagedjs_page_content .pagination-staging {
+  display: block !important;
+  position: static !important;
+  left: auto !important;
+  top: auto !important;
+  visibility: visible !important;
+  min-height: 0 !important;
+  max-width: none !important;
+  width: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  gap: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+
 .stackedit-print-document.pagedjs-ready .print-source,
 .stackedit-print-document.pagedjs-failed .paged-output {
   display: none !important;

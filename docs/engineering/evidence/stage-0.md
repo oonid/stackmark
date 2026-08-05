@@ -72,6 +72,27 @@ Fresh gates after these fixes:
 
 Both remaining red tests are intentionally left red pending the architectural decision. Neither was weakened.
 
+### Resolution of the six-versus-two page mismatch (2026-08-05)
+
+The decision was to patch Paged.js for defect 3 and keep the automatic fallback. After that patch the preview paginated but still produced six pages against the native PDF's two. That gap was also caused by this repository, not by Paged.js.
+
+Paged.js's `rebuildAncestors` reconstructs a broken node's ancestor chain onto each new page so inherited styling survives the break. The pagination staging host lives inside the application shell, so the reconstructed chain was `html > body > #app > main.proof-shell > section.proof-grid > section.proof-card.print-proof-card`. Those rebuilt wrappers are empty, but they carried their screen chrome onto every page — measured as `min-height: 208px`, `padding: 0 20px 20px`, a 1px border and a 12px radius on the card, plus 48px of shell padding, and a 16px grid row gap. That is the large empty rounded box that appeared before each paragraph and the reason pages looked sparse.
+
+`print-shell.css` now neutralizes application chrome for any shell wrapper that ends up inside `.pagedjs_page_content`. The preview then produced exactly two pages, matching the native PDF, and a screenshot confirmed a dense, correctly laid out A4 page with the running title, the table, the KaTeX display expression and the `Page 1 of 2` counter. A browser regression asserts no rebuilt shell wrapper inside a page carries min-height, padding, border or row gap.
+
+Final tally for the print work: of the four distinct print failures, three were this repository's own defects — the empty stylesheet list, the `@page` cascade order, and the rebuilt shell chrome — and one was the upstream break-token null dereference, now patched.
+
+Fresh full matrix, all green:
+
+- `cargo fmt -- --check` — PASS. `cargo test` — PASS, 11 tests.
+- `./dev unit` — PASS, 45 tests, no unhandled errors.
+- `./dev lint` — PASS. `./dev frontend-build` — PASS.
+- `./dev e2e` — PASS, 11 tests.
+- `bash tests/tooling/dev-wrapper.test.sh` — PASS.
+- `git diff --check` — PASS.
+
+Still outstanding for Task 6: the KDE host re-smoke with both processes restarted rather than hot-reloaded, then a scoped re-review, then ADR 0001.
+
 Current unresolved print-preview evidence (superseded by the analysis above; retained for history):
 
 - Paged.js 0.4.3 screen output produces six pages for the fixture while the automated native PDF contains two pages. Diagnostic page text lengths were `[484, 742, 682, 604, 386, 0]`; the last page is diagram-only.
