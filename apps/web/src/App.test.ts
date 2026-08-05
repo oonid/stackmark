@@ -12,6 +12,19 @@ vi.mock('./mermaid/MermaidSandbox', () => ({
   }),
 }))
 
+// Paged.js is a browser-layout polyfill; running it under jsdom exercises no
+// real pagination and injects stylesheets jsdom cannot compute styles against.
+// Pagination is proven in the Chromium and WebKitGTK gates instead.
+vi.mock('@stackedit/print', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@stackedit/print')>()),
+  installNativePageRule: vi.fn(),
+  paginate: vi.fn(async () => ({
+    mode: 'plain-css' as const,
+    pageCount: 0,
+    warnings: [{ code: 'PAGEDJS_FAILED' as const, message: 'not exercised under jsdom' }],
+  })),
+}))
+
 describe('Stage 0 proof screen', () => {
   it('presents the required web and desktop proof gates', () => {
     const wrapper = mount(App)

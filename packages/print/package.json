@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/paginate.ts",
-    "./print.css": "./src/print.css"
+    "./print-document.css": "./src/print-document.css",
+    "./print-shell.css": "./src/print-shell.css"
   },
   "scripts": {
     "unit": "vitest run --environment jsdom"

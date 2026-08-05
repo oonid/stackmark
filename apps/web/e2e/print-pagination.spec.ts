@@ -89,6 +89,45 @@ test('paginates sanitized proof content and records screen-preview page metadata
   await pages.first().screenshot({ path: 'test-results/print/pagedjs-page-1.png' })
 })
 
+test('renders screen preview pages at the stylesheet A4 geometry with generated margin boxes', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByTestId('print-pagination-status')).toContainText(/pages ready/i)
+
+  const geometry = await page.getByTestId('print-document').evaluate((documentElement) => {
+    // Measure a millimetre reference in the live document rather than assuming 96dpi.
+    const probe = document.createElement('div')
+    probe.style.cssText = 'position:absolute;top:0;left:0;width:210mm;height:297mm;visibility:hidden;pointer-events:none'
+    document.body.appendChild(probe)
+    const a4 = probe.getBoundingClientRect()
+    const millimetre = a4.width / 210
+    probe.remove()
+
+    const sheet = documentElement.querySelector<HTMLElement>('.pagedjs_sheet')!
+    const content = documentElement.querySelector<HTMLElement>('.pagedjs_page_content')!
+    const sheetBox = sheet.getBoundingClientRect()
+    const contentBox = content.getBoundingClientRect()
+
+    return {
+      sheetWidthMm: sheetBox.width / millimetre,
+      sheetHeightMm: sheetBox.height / millimetre,
+      contentWidthMm: contentBox.width / millimetre,
+      contentHeightMm: contentBox.height / millimetre,
+      runningTitle: documentElement.querySelector<HTMLElement>('.pagedjs_margin-top-center .pagedjs_margin-content')?.textContent?.trim() ?? '',
+      pageCounter: documentElement.querySelector<HTMLElement>('.pagedjs_margin-bottom-center .pagedjs_margin-content')?.textContent?.trim() ?? '',
+    }
+  })
+
+  // A4 portrait, per the @page rule in packages/print/src/print-document.css.
+  expect(geometry.sheetWidthMm).toBeCloseTo(210, 0)
+  expect(geometry.sheetHeightMm).toBeCloseTo(297, 0)
+  // A4 minus the configured 16mm/14mm/18mm margins.
+  expect(geometry.contentWidthMm).toBeCloseTo(182, 0)
+  expect(geometry.contentHeightMm).toBeCloseTo(263, 0)
+  // Generated margin boxes from the same @page rule.
+  expect(geometry.runningTitle).toBe('StackEdit print proof')
+  expect(geometry.pageCounter).toMatch(/^Page \d+ of \d+$/)
+})
+
 test('falls back to printable plain CSS when pagination is forced to fail', async ({ page }) => {
   await page.goto('/?printFallback=1')
 
@@ -100,9 +139,11 @@ test('falls back to printable plain CSS when pagination is forced to fail', asyn
   await expect(page.getByTestId('print-document').locator(':scope > .paged-output')).toBeHidden()
 })
 
-test('prints the native plain-CSS source exactly once when screen pagination succeeds', async ({ page }) => {
+test('prints the native plain-CSS source exactly once at A4, whichever preview mode settles', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByTestId('print-pagination-status')).toContainText(/pages ready/i)
+  // The native print path is authoritative and must not depend on Paged.js
+  // succeeding, so this gate accepts either settled preview mode.
+  await expect(page.getByTestId('print-pagination-status')).toContainText(/pages ready|plain CSS/i)
   await page.emulateMedia({ media: 'print' })
 
   const printDocument = page.locator('#app > .proof-shell > .proof-grid > .print-proof-card > [data-testid="print-document"]')
@@ -121,21 +162,32 @@ test('prints the native plain-CSS source exactly once when screen pagination suc
   await expect(source).toHaveCount(1)
   await expect(source).toBeVisible()
   await expect(output).toBeHidden()
+  // No `format` here on purpose: the page size must come from the document's own
+  // @page rule, otherwise this gate cannot prove A4 correctness.
   const pdf = await page.pdf({
     path: 'test-results/print/native-print-source.pdf',
-    format: 'A4',
     preferCSSPageSize: true,
     printBackground: true,
   })
   expect(pdf.subarray(0, 5).toString()).toBe('%PDF-')
   expect(pdf.byteLength).toBeGreaterThan(10_000)
-  expect(pdf.toString('latin1').match(/\/Type\s*\/Page\b/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
+  expect(pdf.toString('latin1').match(/\/Type\s*\/Page\b/g)?.length ?? 0).toBe(2)
+
+  const mediaBox = pdf.toString('latin1').match(/\/MediaBox\s*\[\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\]/)
+  expect(mediaBox, 'PDF declares a MediaBox').not.toBeNull()
+  const widthPt = Number(mediaBox![3]) - Number(mediaBox![1])
+  const heightPt = Number(mediaBox![4]) - Number(mediaBox![2])
+  // A4 portrait in PostScript points: 210mm x 297mm.
+  expect(widthPt).toBeCloseTo(595.28, 0)
+  expect(heightPt).toBeCloseTo(841.89, 0)
 })
 
 test('prints sanitized Mermaid with explicit light-paper colors in dark mode', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' })
   await page.goto('/')
-  await expect(page.getByTestId('print-pagination-status')).toContainText(/pages ready/i)
+  // Asserts on the native print source, which does not depend on Paged.js,
+  // so either settled preview mode is acceptable here.
+  await expect(page.getByTestId('print-pagination-status')).toContainText(/pages ready|plain CSS/i)
   await page.emulateMedia({ colorScheme: 'dark', media: 'print' })
 
   const printSource = page
@@ -158,7 +210,9 @@ test('prints sanitized Mermaid with explicit light-paper colors in dark mode', a
 
 test('keeps the simple Mermaid proof centered within a readable print width', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByTestId('print-pagination-status')).toContainText(/pages ready/i)
+  // Asserts on the native print source, which does not depend on Paged.js,
+  // so either settled preview mode is acceptable here.
+  await expect(page.getByTestId('print-pagination-status')).toContainText(/pages ready|plain CSS/i)
   await page.emulateMedia({ media: 'print' })
 
   const diagram = page

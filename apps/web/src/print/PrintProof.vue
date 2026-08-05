@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue'
-import { DEFAULT_PRINT_SETTINGS, paginate } from '@stackedit/print'
-import '@stackedit/print/print.css'
+import { DEFAULT_PRINT_SETTINGS, installNativePageRule, paginate } from '@stackedit/print'
+import '@stackedit/print/print-document.css'
+import '@stackedit/print/print-shell.css'
+// The document stylesheet as text. Paged.js reads @page geometry only from the
+// stylesheets it is handed, never from the live document. The shell stylesheet
+// is deliberately withheld: Paged.js de-mediates @media print, which would
+// apply the off-screen staging `display: none` rule to the tree it lays out.
+import printDocumentCssText from '@stackedit/print/print-document.css?inline'
 import type { RenderedMarkdown } from '@stackedit/markdown'
 
 const props = defineProps<{
@@ -50,7 +56,12 @@ async function paginateDocument(): Promise<void> {
     waitForMermaid: async () => { await waitForStaticMermaid() },
     preview: props.forceFallback ? async () => new Promise(() => undefined) : undefined,
     timeoutMs: props.forceFallback ? 1 : 10_000,
+    stylesheets: [{ [new URL('print-document.css', window.location.href).href]: printDocumentCssText }],
   })
+  // Must run after pagination: Paged.js appends its own @page (letter, no
+  // margins) to the head during setup, which would otherwise outrank ours on
+  // the native print path.
+  installNativePageRule(printDocumentCssText, document)
   stagingNodes.delete(detachedSource)
   stagingNodes.delete(detachedTarget)
   if (currentGeneration !== generation || !pagedTarget.value) {

@@ -27,6 +27,9 @@ export interface PaginationResult {
   warnings: PaginationWarning[]
 }
 
+/** A Paged.js stylesheet: either a URL, or a single `{ url: cssText }` entry. */
+export type PagedStylesheet = string | Record<string, string>
+
 export interface PaginateOptions {
   document: Document
   source: HTMLElement
@@ -35,6 +38,11 @@ export interface PaginateOptions {
   waitForKatex?: () => Promise<void>
   waitForMermaid?: () => Promise<void>
   preview?: (source: HTMLElement, target: HTMLElement) => Promise<{ total?: number }>
+  /**
+   * Print stylesheets handed to Paged.js. Required for the Paged.js path:
+   * @page geometry is read from these, never from the live document.
+   */
+  stylesheets?: PagedStylesheet[]
 }
 
 export const DEFAULT_PRINT_SETTINGS: PrintSettings = {
@@ -75,7 +83,9 @@ export async function paginate(options: PaginateOptions): Promise<PaginationResu
       await awaitPrintResources(options.source, options.document)
       await options.waitForKatex?.()
       await options.waitForMermaid?.()
-      return options.preview ? options.preview(options.source, options.target) : previewPaged(options.source, options.target)
+      return options.preview
+        ? options.preview(options.source, options.target)
+        : previewPaged(options.source, options.target, options.stylesheets ?? [])
     },
       timeoutMs,
     )
@@ -96,9 +106,21 @@ export async function paginate(options: PaginateOptions): Promise<PaginationResu
   }
 }
 
-async function previewPaged(source: HTMLElement, target: HTMLElement): Promise<{ total?: number }> {
+async function previewPaged(
+  source: HTMLElement,
+  target: HTMLElement,
+  stylesheets: PagedStylesheet[],
+): Promise<{ total?: number }> {
+  if (stylesheets.length === 0) {
+    // Paged.js treats an empty-but-present list as "already collected", so it
+    // would paginate against its built-in Letter defaults and report success.
+    throw new Error('no print stylesheet was supplied to Paged.js')
+  }
   const previewer = new Previewer()
-  return previewer.preview(source, [], target)
+  // Paged.js's bundled types declare `string[]`, but Polisher.add also accepts
+  // the `{ url: cssText }` form that Paged.js's own removeStyles() produces.
+  // That form keeps a real base URL for relative url() references.
+  return previewer.preview(source, stylesheets as unknown as string[], target)
 }
 
 function countPages(target: HTMLElement): number {
@@ -125,3 +147,5 @@ function withTimeout<T>(operation: () => Promise<T>, timeoutMs: number): Promise
   })
 }
 import { Previewer } from 'pagedjs'
+
+export { NATIVE_PAGE_RULE_ATTRIBUTE, extractPageRule, installNativePageRule } from './native-page-rule'

@@ -55,6 +55,24 @@ describe('pagination adapter', () => {
     expect(result).toEqual({ mode: 'pagedjs', pageCount: 2, warnings: [] })
   })
 
+  it('refuses the Paged.js path when no print stylesheet is supplied', async () => {
+    // Paged.js only learns @page geometry from the stylesheets it is handed. Given
+    // none, it silently falls back to its built-in Letter defaults, so an empty
+    // stylesheet list must be treated as a failure rather than a successful run.
+    const document = {
+      fonts: { ready: Promise.resolve() },
+      querySelectorAll: () => [],
+    } as unknown as Document
+    const source = globalThis.document.createElement('article')
+    const target = globalThis.document.createElement('div')
+
+    const result = await paginate({ document, source, target, stylesheets: [] })
+
+    expect(result.mode).toBe('plain-css')
+    expect(result.warnings[0]?.code).toBe('PAGEDJS_FAILED')
+    expect(result.warnings[0]?.message).toMatch(/stylesheet/i)
+  })
+
   it('selects the plain-CSS fallback when Paged.js fails or times out', async () => {
     const document = {
       fonts: { ready: Promise.resolve() },

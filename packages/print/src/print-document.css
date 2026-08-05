@@ -1,3 +1,15 @@
+/*
+ * Print document stylesheet.
+ *
+ * This is the stylesheet handed to Paged.js, and it must stay free of
+ * application-shell rules. Paged.js's print-media handler removes the
+ * `@media print` wrapper and appends those rules unconditionally, so any
+ * shell rule here would also apply to the screen preview — including
+ * `display: none` rules that break Paged.js's layout entirely.
+ *
+ * Shell and preview-mode rules belong in print-shell.css.
+ */
+
 @page {
   size: A4 portrait;
   margin: 16mm 14mm 18mm;
@@ -11,58 +23,6 @@
     content: "Page " counter(page) " of " counter(pages);
     font-size: 9pt;
   }
-}
-
-.print-proof-card {
-  grid-column: 1 / -1;
-}
-
-.paged-output {
-  max-width: 100%;
-  overflow-x: auto;
-}
-
-@media print {
-  .proof-header,
-  .proof-grid > :not(.print-proof-card) {
-    display: none !important;
-  }
-
-  .proof-shell {
-    width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-
-  .proof-grid {
-    display: block !important;
-  }
-
-  .print-proof-card {
-    display: block !important;
-    min-height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: 0 !important;
-    box-shadow: none !important;
-  }
-
-  .print-proof-card > #print-proof-heading,
-  .print-proof-card > [data-testid='print-pagination-status'] {
-    display: none !important;
-  }
-
-  .pagination-staging {
-    display: none !important;
-  }
-}
-
-.pagination-staging {
-  position: absolute;
-  top: 0;
-  left: -100000px;
-  visibility: hidden;
-  pointer-events: none;
 }
 
 .stackedit-print-document {
@@ -153,28 +113,4 @@
 
 .stackedit-print-document thead {
   display: table-header-group;
-}
-
-.stackedit-print-document.pagedjs-ready .print-source,
-.stackedit-print-document.pagedjs-failed .paged-output {
-  display: none !important;
-}
-
-.stackedit-print-document.pagedjs-ready .paged-output,
-.stackedit-print-document.pagedjs-failed .print-source {
-  display: block !important;
-}
-
-@media print {
-  .stackedit-print-document.pagedjs-ready > .print-source,
-  .stackedit-print-document.pagedjs-failed > .print-source,
-  .stackedit-print-document:not(.pagedjs-ready):not(.pagedjs-failed) > .print-source {
-    display: block !important;
-  }
-
-  .stackedit-print-document.pagedjs-ready > .paged-output,
-  .stackedit-print-document.pagedjs-failed > .paged-output,
-  .stackedit-print-document:not(.pagedjs-ready):not(.pagedjs-failed) > .paged-output {
-    display: none !important;
-  }
 }

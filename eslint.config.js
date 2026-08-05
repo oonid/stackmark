@@ -25,6 +25,9 @@ module.exports = tseslint.config(
         document: 'readonly',
         DOMParser: 'readonly',
         HTMLElement: 'readonly',
+        SVGElement: 'readonly',
+        SVGSVGElement: 'readonly',
+        URL: 'readonly',
         URLSearchParams: 'readonly',
       },
       parserOptions: {
