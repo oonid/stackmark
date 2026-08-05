@@ -35,6 +35,14 @@ grep -Fx "$(id -u):$(id -g)" "$STACKEDIT_DOCKER_IDS"
 
 (
   cd "$repo_root/tests"
+  PATH="$test_dir:$PATH" "$repo_root/dev" e2e
+)
+
+expected_e2e_args="compose --project-directory $repo_root -f $repo_root/compose.yaml run --rm browser pnpm e2e"
+grep -Fx "$expected_e2e_args" "$STACKEDIT_DOCKER_ARGS"
+
+(
+  cd "$repo_root/tests"
   PATH="$test_dir:$PATH" STACKEDIT_IN_BUILDER=1 PNPM_BIN="$test_dir/pnpm" \
     "$repo_root/dev" frontend-build
 )

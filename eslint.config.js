@@ -6,6 +6,7 @@ module.exports = tseslint.config(
   {
     ignores: [
       '**/dist/**',
+      'apps/web/public/generated/**',
       '**/node_modules/**',
       'build/*.js',
       'config/*.js',

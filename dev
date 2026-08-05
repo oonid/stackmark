@@ -23,7 +23,7 @@ case "$command_name" in
   frontend-dev) run_compose up frontend ;;
   frontend-build) run_pnpm build ;;
   unit) run_pnpm unit ;;
-  e2e) run_pnpm e2e ;;
+  e2e) run_compose run --rm browser pnpm e2e ;;
   lint) run_pnpm lint ;;
   install) run_pnpm install --frozen-lockfile ;;
   install-update) run_pnpm install ;;

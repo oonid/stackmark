@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./mermaid/protocol": "./src/mermaid/protocol.ts",
+    "./mermaid/svg-sanitizer": "./src/mermaid/svg-sanitizer.ts"
   },
   "scripts": {
     "unit": "vitest run --environment jsdom"
