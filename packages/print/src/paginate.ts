@@ -122,18 +122,28 @@ const OVERFLOW_TOLERANCE_PX = 1
  * the page instead of moving it to the next one. The text is present in the
  * document, so comparing text cannot see it, but a reader cannot read it.
  */
-export function worstHiddenOverflow(
-  box: { right: number; bottom: number },
-  items: Array<{ right: number; bottom: number }>,
-): number {
+export interface Box {
+  left: number
+  top: number
+  right: number
+  bottom: number
+}
+
+export function worstHiddenOverflow(box: Box, items: Box[]): number {
   let worst = 0
   for (const item of items) {
-    worst = Math.max(worst, item.right - box.right, item.bottom - box.bottom)
+    worst = Math.max(
+      worst,
+      item.right - box.right,
+      item.bottom - box.bottom,
+      box.left - item.left,
+      box.top - item.top,
+    )
   }
   return worst
 }
 
-function findPagesHidingContent(target: HTMLElement): number[] {
+export function findPagesHidingContent(target: HTMLElement): number[] {
   const pages = Array.from(target.querySelectorAll<HTMLElement>('.pagedjs_page_content'))
   const hiding: number[] = []
   pages.forEach((content, index) => {
@@ -174,12 +184,6 @@ export async function paginate(options: PaginateOptions): Promise<PaginationResu
       const dropped = findDroppedText(sourceText, readPagedText(options.target))
       if (dropped.length > 0) {
         throw new IncompletePaginationError(`dropped content near "${dropped[0]}"`)
-      }
-      const hiding = findPagesHidingContent(options.target)
-      if (hiding.length > 0) {
-        throw new IncompletePaginationError(
-          `hides content outside the page box on page ${hiding.join(', ')}`,
-        )
       }
     }
     return { mode: 'pagedjs', pageCount: flow.total ?? countPages(options.target), warnings: [] }

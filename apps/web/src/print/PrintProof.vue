@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue'
-import { DEFAULT_PRINT_SETTINGS, installNativePageRule, paginate } from '@stackedit/print'
+import { DEFAULT_PRINT_SETTINGS, findPagesHidingContent, installNativePageRule, paginate } from '@stackedit/print'
 import '@stackedit/print/print-document.css'
 import '@stackedit/print/print-shell.css'
 // The document stylesheet as text. Paged.js reads @page geometry only from the
@@ -70,20 +70,33 @@ async function paginateDocument(): Promise<void> {
     return
   }
 
-  if (result.mode === 'pagedjs') {
+  let mode = result.mode
+  let warning = result.warnings[0]?.message
+  if (mode === 'pagedjs') {
     pagedTarget.value.replaceChildren(...Array.from(detachedTarget.childNodes))
     pagedTarget.value.querySelectorAll('.pagedjs_page').forEach((page, index) => {
       page.setAttribute('data-preview-page-number', String(index + 1))
     })
+    // Pagination is computed off-screen and then re-parented here, where the
+    // browser lays it out again. Only this tree is shown, so only this tree can
+    // be trusted: an engine may leave part of a split paragraph outside the
+    // visible column, present in the text and unreadable.
+    await nextTick()
+    const hiding = findPagesHidingContent(pagedTarget.value)
+    if (hiding.length > 0) {
+      mode = 'plain-css'
+      warning = `Paged.js hides content outside the page box on page ${hiding.join(', ')}; using plain CSS.`
+      pagedTarget.value.replaceChildren()
+    }
   } else {
     pagedTarget.value.replaceChildren()
   }
   detachedSource.remove()
   detachedTarget.remove()
-  paginationState.value = result.mode
-  status.value = result.mode === 'pagedjs'
+  paginationState.value = mode
+  status.value = mode === 'pagedjs'
     ? `${result.pageCount} pages ready for printing.`
-    : `Using plain CSS fallback: ${result.warnings[0]?.message}`
+    : `Using plain CSS fallback: ${warning}`
 }
 
 const svgPresentationAttributes = [

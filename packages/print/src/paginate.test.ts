@@ -3,6 +3,7 @@ import {
   DEFAULT_PRINT_SETTINGS,
   awaitPrintResources,
   findDroppedText,
+  findPagesHidingContent,
   worstHiddenOverflow,
   paginate,
   printPolicy,
@@ -51,20 +52,62 @@ describe('findDroppedText', () => {
 })
 
 describe('worstHiddenOverflow', () => {
-  const box = { right: 688, bottom: 994 }
+  const box = { left: 0, top: 0, right: 688, bottom: 994 }
 
   it('is zero when every item sits inside the page box', () => {
-    expect(worstHiddenOverflow(box, [{ right: 688, bottom: 994 }, { right: 400, bottom: 200 }])).toBe(0)
+    expect(worstHiddenOverflow(box, [
+      { left: 0, top: 0, right: 688, bottom: 994 },
+      { left: 10, top: 10, right: 400, bottom: 200 },
+    ])).toBe(0)
   })
 
   it('measures content parked in a clipped column beside the page', () => {
-    // WebKitGTK leaves the remainder in the next column rather than moving it to
-    // the next page, so it is laid out but unreadable.
-    expect(worstHiddenOverflow(box, [{ right: 2481, bottom: 994 }])).toBe(1793)
+    expect(worstHiddenOverflow(box, [{ left: 1793, top: 0, right: 2481, bottom: 994 }])).toBe(1793)
+  })
+
+  it('measures content parked to the left of the page box', () => {
+    // WebKitGTK leaves the remainder of a split paragraph 90px left of the
+    // visible column, where it is laid out, present in the text, and unreadable.
+    expect(worstHiddenOverflow(box, [{ left: -90, top: 0, right: -778 + 688, bottom: 994 }])).toBe(90)
   })
 
   it('measures content that runs below the page box', () => {
-    expect(worstHiddenOverflow(box, [{ right: 688, bottom: 1200 }])).toBe(206)
+    expect(worstHiddenOverflow(box, [{ left: 0, top: 0, right: 688, bottom: 1200 }])).toBe(206)
+  })
+
+  it('measures content that runs above the page box', () => {
+    expect(worstHiddenOverflow(box, [{ left: 0, top: -40, right: 688, bottom: 994 }])).toBe(40)
+  })
+})
+
+describe('findPagesHidingContent', () => {
+  const rect = (left: number, top: number, right: number, bottom: number) => () =>
+    ({ left, top, right, bottom, width: right - left, height: bottom - top, x: left, y: top, toJSON: () => ({}) }) as DOMRect
+
+  const buildPage = (root: HTMLElement, text: string, itemRect: () => DOMRect) => {
+    const page = globalThis.document.createElement('div')
+    page.className = 'pagedjs_page_content'
+    page.getBoundingClientRect = rect(0, 0, 688, 994)
+    const item = globalThis.document.createElement('p')
+    item.textContent = text
+    item.getBoundingClientRect = itemRect
+    page.appendChild(item)
+    root.appendChild(page)
+  }
+
+  it('reports no page when all content sits inside its box', () => {
+    const root = globalThis.document.createElement('div')
+    buildPage(root, 'visible content', rect(0, 0, 600, 400))
+
+    expect(findPagesHidingContent(root)).toEqual([])
+  })
+
+  it('reports the page whose content is parked outside the box', () => {
+    const root = globalThis.document.createElement('div')
+    buildPage(root, 'visible content', rect(0, 0, 600, 400))
+    buildPage(root, 'unreadable remainder', rect(-90, 0, -90 + 688, 994))
+
+    expect(findPagesHidingContent(root)).toEqual([2])
   })
 })
 
@@ -170,41 +213,6 @@ describe('pagination adapter', () => {
     })
 
     expect(result).toEqual({ mode: 'pagedjs', pageCount: 2, warnings: [] })
-  })
-
-  it('falls back to plain CSS when a page hides content outside its box', async () => {
-    const rect = (right: number, bottom: number) => () => ({ right, bottom, left: 0, top: 0, width: right, height: bottom, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect
-    const document = {
-      fonts: { ready: Promise.resolve() },
-      querySelectorAll: () => [],
-    } as unknown as Document
-    const source = globalThis.document.createElement('article')
-    source.textContent = 'Alpha retained. Omega is laid out but parked outside the visible column.'
-    const target = globalThis.document.createElement('div')
-
-    const result = await paginate({
-      document,
-      source,
-      target,
-      preview: async (_source, into) => {
-        const page = globalThis.document.createElement('div')
-        page.className = 'pagedjs_page_content'
-        page.getBoundingClientRect = rect(688, 994)
-        const visible = globalThis.document.createElement('p')
-        visible.textContent = 'Alpha retained.'
-        visible.getBoundingClientRect = rect(600, 400)
-        const clipped = globalThis.document.createElement('p')
-        clipped.textContent = 'Omega is laid out but parked outside the visible column.'
-        clipped.getBoundingClientRect = rect(2481, 994)
-        page.append(visible, clipped)
-        into.appendChild(page)
-        return { total: 1 }
-      },
-    })
-
-    expect(result.mode).toBe('plain-css')
-    expect(result.warnings[0]?.code).toBe('PAGEDJS_INCOMPLETE')
-    expect(result.warnings[0]?.message).toMatch(/hides content/i)
   })
 
   it('refuses the Paged.js path when no print stylesheet is supplied', async () => {
