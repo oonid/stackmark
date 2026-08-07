@@ -139,6 +139,22 @@ Two independent guards now cover it, neither of which fires on correct output in
 
 Both demote the preview to the plain-CSS fallback rather than presenting a page with a hole in it. The text comparison alone was written first and would not have caught the geometry case; the geometry check alone would not catch outright loss.
 
+### Defect 1 resolved, and what it means for the preview (2026-08-08)
+
+The earlier conclusion that the preview was complete was wrong. It came from measuring the off-screen staging tree, which is complete, rather than the tree on screen, which is not. Measuring the live pages on the host settled it: the remainder of the split paragraph sits ninety pixels left of the visible column, with a hundred and sixty-five pixel gap at the foot of the previous page, and the worst element is roughly three and a half thousand pixels outside its page box.
+
+Three independent causes were stacked, and each fix only exposed the next:
+
+1. the guards ran inside `paginate`, so they inspected the staging copy rather than the displayed pages;
+2. the geometry comparison covered only the right and bottom edges, while the escaped content is parked to the left;
+3. the check ran at placement, before the browser had laid the re-parented pages out again, when they still report their off-screen positions.
+
+Host verification after all three: the preview reports `Paged.js hides content outside the page box on page 2; using plain CSS` and shows the complete continuous document.
+
+The practical consequence for Stage 0 is that **the Paged.js page preview does not work on the reference host**. Chromium paginates the same document correctly at A4, so the web surface keeps it, but on KDE neon with WebKitGTK 2.52.3 the preview reliably degrades to the continuous plain-CSS document. Native printing is unaffected and remains the authoritative path, and its output is complete and correct on both engines.
+
+This should be recorded in ADR 0001 as a named deviation rather than presented as a working gate: the desktop application has no page-accurate on-screen preview, and phase one's Print Studio cannot promise one until an engine passes this gate on WebKitGTK.
+
 Still outstanding for Task 6: a scoped re-review, then ADR 0001.
 
 Current unresolved print-preview evidence (superseded by the analysis above; retained for history):
