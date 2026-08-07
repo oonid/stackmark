@@ -11,7 +11,7 @@ use std::{
 #[cfg(target_os = "linux")]
 use std::os::fd::{AsRawFd, OwnedFd};
 
-use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 #[cfg(target_os = "linux")]
 use rustix::fs::{fstat, open, openat2, Mode, OFlags, ResolveFlags};
 use serde::Serialize;
@@ -398,7 +398,17 @@ where
 
 fn event_paths(event: notify::Result<Event>) -> HashSet<PathBuf> {
     event
-        .map(|event| event.paths.into_iter().collect())
+        .map(|event| {
+            // Describing a change means opening and hashing the file, and that
+            // read is itself reported by the watcher. Access events never carry
+            // a content change, and acting on them makes the watcher wake
+            // itself in a loop until the own-write record expires and the
+            // unchanged file is announced as an external edit.
+            if matches!(event.kind, EventKind::Access(_)) {
+                return HashSet::new();
+            }
+            event.paths.into_iter().collect()
+        })
         .unwrap_or_default()
 }
 

@@ -280,3 +280,27 @@ fn watcher_stops_on_drop_and_can_restart_cleanly() {
         .expect("restarted watcher event");
     assert_eq!(event.path, "after-restart.md");
 }
+
+#[test]
+fn watcher_does_not_retrigger_itself_by_reading_the_file_it_watches() {
+    let (_directory, service) = workspace();
+    let (sender, receiver) = mpsc::channel();
+    let _watch = service
+        .start_workspace_watch(move |event| {
+            let _ = sender.send(event);
+        })
+        .expect("workspace watcher");
+
+    service
+        .atomic_write_markdown("proof.md", b"written by service")
+        .expect("service write");
+
+    // Describing a change means opening and hashing the file, which the watcher
+    // itself observes. Waiting past the own-write window proves that read does
+    // not feed back: otherwise the record expires and the unchanged file starts
+    // being reported as an external change.
+    assert!(
+        receiver.recv_timeout(Duration::from_secs(3)).is_err(),
+        "the watcher must not report a file that nothing has changed"
+    );
+}
