@@ -1,0 +1,96 @@
+# 0001 — StackEdit Stage 0 feasibility
+
+- **Status:** Accepted for the application architecture. The Stage 0 go/no-go is deferred: the Debian packaging gate has not been run.
+- **Date:** 2026-08-08
+- **Scope:** The Stage 0 vertical feasibility slice on `feat/stage-zero`. Not the phase-one product.
+
+## Context
+
+Stage 0 asks whether a clean StackEdit rewrite can use a Docker-only JavaScript toolchain, share one Vue/Vite frontend between web and Tauri, render KaTeX and isolated Mermaid safely, paginate and print through WebKitGTK, detect external file changes, save Markdown atomically, and produce an installable `.deb`.
+
+Every gate below was exercised on the reference host and verified by recomputing hashes, reading `stat`, and measuring generated PDFs rather than reading values off the interface. Where a claim rests on one engine only, that is stated.
+
+## Environment tested
+
+| | |
+|---|---|
+| Host | KDE neon on an Ubuntu 24.04 LTS base, x86-64 |
+| Web engine (desktop) | WebKitGTK 2.52.3 |
+| Web engine (browser gates) | Chromium via Playwright 1.54.2 |
+| Rust | 1.88.0, host-native |
+| Tauri CLI | 2.10.1 on the host; the plan pins 2.11.4 |
+| Node / pnpm | 24.18.0 / 11.20.0, in Docker only |
+| Paged.js | 0.4.3 with a local patch |
+
+## Decisions
+
+### 1. JavaScript runs only in Docker
+
+`./dev` dispatches every Node, pnpm, Vite, lint, unit and browser command into containers. `tauri.conf.json` declares no `beforeDevCommand`, so the desktop shell attaches to the container-served dev server rather than invoking a host toolchain. Rust stays host-native by design.
+
+### 2. One Vue frontend serves both surfaces
+
+The same build drives the browser and the Tauri window. The desktop capability surface is reached through a single gateway interface rather than direct imports scattered through components.
+
+### 3. Mermaid renders in an opaque-origin sandbox
+
+Mermaid executes in an iframe created with exactly `sandbox="allow-scripts"`, from a generated external renderer document, authorised by a build-owned nonce. The parent validates `event.source` and requires `event.origin === 'null'`, and only separately sanitized SVG crosses back. Preview HTML, Mermaid SVG and print content use distinct sanitizer configurations.
+
+A nonce is used rather than `script-src 'self'` because a sandboxed frame without `allow-same-origin` has an opaque origin, and WebKitGTK does not consistently authorise an external script under `'self'` in that state. This was found by the desktop gate failing where Chromium passed.
+
+### 4. Workspace access is confined by the kernel, not by string checks
+
+On Linux the service holds an open root directory descriptor and resolves below it with `openat2` using `RESOLVE_BENEATH`, `NO_MAGICLINKS` and `NO_SYMLINKS`. Writes go to a temporary file in the target directory, are synced, and are persisted atomically, with directory identity checked before and after. A rename-plus-symlink-swap regression must fail without writing outside the workspace.
+
+The watcher reports normalized workspace-relative changes with hash and modification time. It ignores access events, because describing a change means reading the file and that read is itself observable — acting on it made the watcher wake itself once per debounce forever.
+
+### 5. System printing is authoritative; the page preview is progressive enhancement
+
+The system print dialog produces the PDF. The application does not write PDF bytes or bundle a rendering engine.
+
+Paged.js provides an on-screen page preview where it demonstrably works, and the preview verifies itself: pagination is compared against the source for discarded content, and the placed pages are measured, once layout settles, for content laid out beyond the visible page box. Either failure demotes the preview to the continuous plain-CSS document. A preview that silently omits content is worse than no preview.
+
+## Deviations
+
+These are accepted for Stage 0 and constrain phase one.
+
+### D1 — WebKitGTK ignores `@page` geometry
+
+The default export measured US Letter at 612 × 792 pt despite `@page { size: A4 portrait }`, with margins near 6.3 / 6.5 / 14.3 / 10.6 mm rather than the declared 14 / 16 / 18 mm. Paper and margins are governed by the print dialog. A4 is reachable only by selecting it there, and is then correct: 595 × 842 pt, two pages, no content outside the page box. Chromium honours the rule, so page geometry is document-controlled on the web and user-controlled on the Linux desktop.
+
+### D2 — `@page` margin boxes never reach printed output
+
+The exported PDF contains no running header and no page counter. No browser implements CSS margin boxes. Any running title or page number must be composed into the document body, or not promised.
+
+### D3 — The Paged.js page preview does not work on the reference host
+
+Chromium paginates the fixture correctly at A4 with generated margin boxes. On WebKitGTK the same document leaves the remainder of a split paragraph outside the visible column, so the preview reliably falls back to the continuous document. **The desktop application has no page-accurate on-screen preview.**
+
+Paged.js 0.4.3 also requires a local patch to paginate at all: `createBreakToken` dereferences an unresolved break anchor. The patch extends the early return the function already uses for the equivalent case.
+
+### D4 — Tauri CLI version
+
+The host has 2.10.1 against the plan's 2.11.4. Dev mode is unaffected. The release builder must pin the intended version so the host's does not matter.
+
+## Gates not yet run
+
+- **Debian packaging** — the builder image, `.deb` production, artifact inspection, installation on KDE neon, launch from terminal and application menu, and removal. Task 7.
+- **Offline behaviour of the installed package.** Offline behaviour of the development build passes: editing, KaTeX, Mermaid and pagination work with external networking disabled, and the exported PDF is structurally identical to the online one. The production bundle makes no remote request.
+
+## Decision
+
+**Conditional go for the application architecture.** Docker-only tooling, the shared frontend, Mermaid isolation, workspace path safety, atomic saves, external-change detection, and system printing are all demonstrated on the reference host with automated and host evidence.
+
+**The Stage 0 go/no-go is not yet decidable.** Debian packaging is a mandatory gate in the Stage 0 matrix with no acceptable fallback, and it has not been attempted. This ADR must be revisited when Task 7 completes, and only then can Stage 1 planning be authorised.
+
+Conditions attached to the architectural go:
+
+1. Phase one must not promise a page-accurate desktop preview, page numbers, or running headers on Linux (D1, D2, D3).
+2. The Paged.js patch must be revisited on any dependency upgrade, and the preview's self-verification kept — it is the only thing standing between a silent content loss and the reader.
+3. The release builder must pin its own Tauri CLI (D4).
+
+## Consequences
+
+Print Studio in phase one should treat the system dialog as the pagination authority and present the print document continuously, offering a page preview only where a runtime check shows the engine paginates correctly. Page furniture, if wanted, belongs in the document body.
+
+The security boundaries established here — the opaque Mermaid sandbox, the separate sanitizers, the kernel-confined workspace, and the narrow Tauri capability set — are load-bearing and should not be widened without an equivalent decision record.

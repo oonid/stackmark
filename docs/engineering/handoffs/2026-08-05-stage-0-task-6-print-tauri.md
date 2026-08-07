@@ -5,9 +5,16 @@
 **Isolated worktree:** the `stage-zero` worktree  
 **Branch:** `feat/stage-zero`  
 **Current HEAD:** `18e4a58a` (`feat: prove Tauri workspace file operations`)  
-**Status:** The initial Task 6 implementation and its review fixes are committed, but the fixes have not been re-reviewed. Task 6 is not complete. Task 7 has not started.
+**Status:** SUPERSEDED on 2026-08-08. Kept for history.
 
-This document is the source of truth for resuming the interrupted Task 6 review loop. It distinguishes confirmed behavior from experiments, current risks, and architectural alternatives. Do not infer that Task 6 is complete from older green test counts in the ledger or evidence file.
+> **This document is no longer the source of truth.** The questions it poses were answered by measurement on 2026-08-07 and 2026-08-08. Read instead:
+>
+> - `docs/engineering/evidence/stage-0.md` — the host smoke, the defects it exposed, and their resolutions;
+> - `docs/decisions/0001-stage-zero-feasibility.md` — the decisions and the named deviations.
+>
+> Summary of what changed: the Paged.js failures this document attributed to library fragility were mostly defects in how this repository drove the library. Of four distinct print failures, three were ours — an empty stylesheet list, `@page` cascade order, and application chrome rebuilt onto every page — and one was an upstream null dereference, now patched. Section 8's architectural alternatives are therefore moot; the outcome is a self-verifying preview that falls back to the continuous document, and Paged.js is used only where a runtime check shows it paginates correctly. Sections 6 through 9 are retained only to show how the question was framed at the time.
+
+The remainder of this document describes the state on 2026-08-05. It distinguished confirmed behavior from experiments, current risks, and architectural alternatives.
 
 ## 1. Constraints that still govern the work
 
@@ -144,6 +151,8 @@ The user confirmed the print proof moved to its own row, then reported multiple 
 
 ## 6. Unresolved Paged.js/native mismatch
 
+> **Resolved.** The six-versus-two page mismatch was application chrome rebuilt onto each page by Paged.js's ancestor reconstruction, and the Letter geometry was an empty stylesheet list. See the evidence file.
+
 The strengthened browser regression uses exactly two populated screen-preview pages as a diagnostic expectation because the same fixture's native PDF proof has two pages. The approved Stage 0 plan originally required only at least two pages, so retaining exact parity is part of the pending architectural decision. The diagnostic currently fails:
 
 ```text
@@ -173,6 +182,8 @@ After three distinct Paged.js failure modes—inline SVG break tokens, responsiv
 
 ## 7. Test truth at handoff
 
+> **Superseded.** The suite is green: 61 unit, 12 Rust, 12 browser, plus lint, build and wrapper gates.
+
 Do not report the suite as green.
 
 - Before the exact two-page regression was added, the complete Docker browser suite passed 9/9. That suite only required at least two pages and therefore failed to detect the six-page mismatch.
@@ -197,6 +208,8 @@ rtk docker compose --project-directory "$PWD" \
 ```
 
 ## 8. Architectural alternatives
+
+> **Moot.** The alternatives below were framed against a Paged.js that had never been handed a stylesheet. The adopted outcome is closest to Alternative B, reached by evidence rather than by choosing in advance: the preview verifies itself and falls back to the continuous document, which is what happens on the reference host.
 
 ### Alternative A — Native-authoritative continuous screen proof (recommended current fallback)
 
@@ -279,6 +292,8 @@ Costs:
 Bundling headless Chromium, using a hosted PDF service, or introducing Pandoc/LaTeX/Typst/Rust PDF generation could produce deterministic PDFs, but each abandons the current same-HTML/CSS system-dialog design, expands packaging/security scope, or breaks web/desktop parity. Treat any of these as a new proposal, not a continuation of Task 6.
 
 ## 9. Recommended continuation sequence
+
+> **Completed.** Superseded by the evidence file and ADR 0001.
 
 The next session must first choose Alternative A, B, C, D, or E. Alternative A is the smallest evidence-backed Stage 0 fallback. Do not start Task 7 before Task 6 is reviewed and classified.
 
