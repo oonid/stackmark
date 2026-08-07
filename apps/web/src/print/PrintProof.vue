@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue'
-import { DEFAULT_PRINT_SETTINGS, findPagesHidingContent, installNativePageRule, paginate } from '@stackedit/print'
+import { DEFAULT_PRINT_SETTINGS, findPagesHidingContentWhenSettled, installNativePageRule, paginate } from '@stackedit/print'
 import '@stackedit/print/print-document.css'
 import '@stackedit/print/print-shell.css'
 // The document stylesheet as text. Paged.js reads @page geometry only from the
@@ -79,15 +79,9 @@ async function paginateDocument(): Promise<void> {
     })
     // Pagination is computed off-screen and then re-parented here, where the
     // browser lays it out again. Only this tree is shown, so only this tree can
-    // be trusted: an engine may leave part of a split paragraph outside the
-    // visible column, present in the text and unreadable.
-    await nextTick()
-    const hiding = findPagesHidingContent(pagedTarget.value)
-    if (hiding.length > 0) {
-      mode = 'plain-css'
-      warning = `Paged.js hides content outside the page box on page ${hiding.join(', ')}; using plain CSS.`
-      pagedTarget.value.replaceChildren()
-    }
+    // be trusted, and only once it has settled: measured at placement it still
+    // reports the staging positions and always looks correct.
+    void verifyPlacedPreview(pagedTarget.value, currentGeneration)
   } else {
     pagedTarget.value.replaceChildren()
   }
@@ -97,6 +91,19 @@ async function paginateDocument(): Promise<void> {
   status.value = mode === 'pagedjs'
     ? `${result.pageCount} pages ready for printing.`
     : `Using plain CSS fallback: ${warning}`
+}
+
+async function verifyPlacedPreview(placed: HTMLElement, generationAtPlacement: number): Promise<void> {
+  const hiding = await findPagesHidingContentWhenSettled(placed, {
+    nextFrame: () => new Promise<void>((resolve) => { window.requestAnimationFrame(() => resolve()) }),
+    now: () => window.performance.now(),
+    fontsReady: document.fonts?.ready,
+  })
+  if (hiding.length === 0 || generationAtPlacement !== generation || pagedTarget.value !== placed) return
+
+  paginationState.value = 'plain-css'
+  status.value = `Using plain CSS fallback: Paged.js hides content outside the page box on page ${hiding.join(', ')}; using plain CSS.`
+  placed.replaceChildren()
 }
 
 const svgPresentationAttributes = [

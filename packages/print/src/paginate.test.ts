@@ -4,6 +4,7 @@ import {
   awaitPrintResources,
   findDroppedText,
   findPagesHidingContent,
+  findPagesHidingContentWhenSettled,
   worstHiddenOverflow,
   paginate,
   printPolicy,
@@ -337,5 +338,53 @@ describe('pagination adapter', () => {
     await awaitPrintResources(source, document)
 
     expect(events).toEqual(expect.arrayContaining(['fonts', 'load', 'error']))
+  })
+})
+
+describe('findPagesHidingContentWhenSettled', () => {
+  const rect = (left: number, right: number) => () =>
+    ({ left, top: 0, right, bottom: 100, width: right - left, height: 100, x: left, y: 0, toJSON: () => ({}) }) as DOMRect
+
+  const build = () => {
+    const root = globalThis.document.createElement('div')
+    const page = globalThis.document.createElement('div')
+    page.className = 'pagedjs_page_content'
+    page.getBoundingClientRect = rect(0, 688)
+    const item = globalThis.document.createElement('p')
+    item.textContent = 'content'
+    item.getBoundingClientRect = rect(0, 600)
+    page.appendChild(item)
+    root.appendChild(page)
+    return { root, item }
+  }
+
+  const clock = () => {
+    let time = 0
+    return { now: () => time, advance: (ms: number) => { time += ms } }
+  }
+
+  it('catches content that only escapes once layout settles', async () => {
+    // Re-parented pages measure as correct until the browser lays them out
+    // again, so a verdict taken immediately after placement sees nothing.
+    const { root, item } = build()
+    const time = clock()
+    let frames = 0
+    const nextFrame = async () => {
+      frames += 1
+      time.advance(16)
+      if (frames === 3) item.getBoundingClientRect = rect(-90, 598)
+    }
+
+    await expect(findPagesHidingContentWhenSettled(root, { nextFrame, now: time.now }))
+      .resolves.toEqual([1])
+  })
+
+  it('reports nothing when the pages stay correct for the whole window', async () => {
+    const { root } = build()
+    const time = clock()
+    const nextFrame = async () => { time.advance(16) }
+
+    await expect(findPagesHidingContentWhenSettled(root, { nextFrame, now: time.now, deadlineMs: 200 }))
+      .resolves.toEqual([])
   })
 })

@@ -9,7 +9,7 @@ const pending = vi.hoisted(() => [] as Array<{
 
 vi.mock('@stackedit/print', () => ({
   DEFAULT_PRINT_SETTINGS: { pageSize: 'A4' },
-  findPagesHidingContent: vi.fn(() => []),
+  findPagesHidingContentWhenSettled: vi.fn(async () => []),
   installNativePageRule: vi.fn(),
   paginate: vi.fn((options: { target: HTMLElement }) => new Promise((resolve) => {
     pending.push({ options, resolve: resolve as (result: { mode: 'pagedjs'; pageCount: number; warnings: [] }) => void })

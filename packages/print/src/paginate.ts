@@ -156,6 +156,37 @@ export function findPagesHidingContent(target: HTMLElement): number[] {
   return hiding
 }
 
+export interface SettleOptions {
+  nextFrame: () => Promise<void>
+  now: () => number
+  fontsReady?: Promise<unknown>
+  deadlineMs?: number
+}
+
+/**
+ * Watches the placed pages until they stop moving, and reports any that hide
+ * content.
+ *
+ * Pages are paginated off-screen and then re-parented for display, and the
+ * browser lays them out again afterwards. A verdict taken at placement measures
+ * the old positions and always looks correct, so this samples until a page is
+ * seen hiding content — which is conclusive — or the window expires.
+ */
+export async function findPagesHidingContentWhenSettled(
+  root: HTMLElement,
+  options: SettleOptions,
+): Promise<number[]> {
+  const deadlineMs = options.deadlineMs ?? 2_000
+  if (options.fontsReady) await options.fontsReady
+  const start = options.now()
+  for (;;) {
+    const hiding = findPagesHidingContent(root)
+    if (hiding.length > 0) return hiding
+    if (options.now() - start >= deadlineMs) return []
+    await options.nextFrame()
+  }
+}
+
 function readPagedText(target: HTMLElement): string {
   const pages = target.querySelectorAll('.pagedjs_page_content')
   if (pages.length === 0) return target.textContent ?? ''
