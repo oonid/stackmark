@@ -3,7 +3,7 @@ use std::{
     fs::{self, File},
     io::{self, Read, Write},
     path::{Component, Path, PathBuf},
-    sync::{mpsc, Arc, Mutex},
+    sync::{mpsc, Arc, Condvar, Mutex},
     thread::{self, JoinHandle},
     time::{Duration, Instant, UNIX_EPOCH},
 };
@@ -70,6 +70,10 @@ pub struct WorkspaceService {
     #[cfg(target_os = "linux")]
     root_fd: Arc<OwnedFd>,
     known_writes: Arc<Mutex<HashMap<PathBuf, KnownWrite>>>,
+    /// Paths whose write has been made visible by `persist` but whose record
+    /// has not landed yet. The watcher waits on these so it can never judge a
+    /// change before the service has finished describing its own write.
+    pending_writes: Arc<(Mutex<HashMap<PathBuf, usize>>, Condvar)>,
 }
 
 impl WorkspaceService {
@@ -90,6 +94,7 @@ impl WorkspaceService {
             #[cfg(target_os = "linux")]
             root_fd: Arc::new(root_fd),
             known_writes: Arc::new(Mutex::new(HashMap::new())),
+            pending_writes: Arc::new((Mutex::new(HashMap::new()), Condvar::new())),
         })
     }
 
@@ -151,6 +156,7 @@ impl WorkspaceService {
             write(&mut temporary)?;
             temporary.as_file_mut().flush()?;
             temporary.as_file().sync_all()?;
+            let _pending = self.pending_write(&relative);
             temporary
                 .persist(&target)
                 .map_err(|error| WorkspaceError::Io(error.error))?;
@@ -160,6 +166,34 @@ impl WorkspaceService {
             self.record_known_write(relative, &metadata);
             Ok(metadata)
         }
+    }
+
+    fn pending_write(&self, relative: &Path) -> PendingWrite<'_> {
+        self.begin_pending_write(relative);
+        PendingWrite {
+            service: self,
+            relative: relative.to_path_buf(),
+        }
+    }
+
+    fn begin_pending_write(&self, relative: &Path) {
+        let (pending, _) = &*self.pending_writes;
+        let mut pending = pending.lock().expect("pending writes lock");
+        *pending.entry(relative.to_path_buf()).or_insert(0) += 1;
+    }
+
+    fn finish_pending_write(&self, relative: &Path) {
+        let (pending, ready) = &*self.pending_writes;
+        {
+            let mut pending = pending.lock().expect("pending writes lock");
+            if let Some(count) = pending.get_mut(relative) {
+                *count = count.saturating_sub(1);
+                if *count == 0 {
+                    pending.remove(relative);
+                }
+            }
+        }
+        ready.notify_all();
     }
 
     fn record_known_write(&self, relative: PathBuf, metadata: &FileMetadata) {
@@ -197,6 +231,10 @@ impl WorkspaceService {
         temporary.as_file_mut().flush()?;
         temporary.as_file().sync_all()?;
         self.ensure_same_directory(parent_relative, &parent_fd, &relative)?;
+        // Registered before persist: once the rename lands the watcher can see
+        // the change immediately, and it must not judge it before this write
+        // has finished describing itself.
+        let _pending = self.pending_write(&relative);
         temporary
             .persist(&target)
             .map_err(|error| WorkspaceError::Io(error.error))?;
@@ -345,7 +383,7 @@ where
             let Ok(metadata) = service.metadata_for_relative(&relative) else {
                 continue;
             };
-            if is_matching_known_write(&service.known_writes, &relative, &metadata) {
+            if is_matching_known_write(&service, &relative, &metadata) {
                 continue;
             }
             callback(WorkspaceEvent {
@@ -364,12 +402,45 @@ fn event_paths(event: notify::Result<Event>) -> HashSet<PathBuf> {
         .unwrap_or_default()
 }
 
+struct PendingWrite<'a> {
+    service: &'a WorkspaceService,
+    relative: PathBuf,
+}
+
+impl Drop for PendingWrite<'_> {
+    fn drop(&mut self) {
+        self.service.finish_pending_write(&self.relative);
+    }
+}
+
+/// Blocks while the service is still completing its own write to this path,
+/// bounded by the same window that governs suppression.
+fn await_pending_write(service: &WorkspaceService, relative: &Path) {
+    let (pending, ready) = &*service.pending_writes;
+    let deadline = Instant::now() + OWN_WRITE_WINDOW;
+    let mut guard = pending.lock().expect("pending writes lock");
+    while guard.contains_key(relative) {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            break;
+        }
+        let (next, timeout) = ready
+            .wait_timeout(guard, remaining)
+            .expect("pending writes wait");
+        guard = next;
+        if timeout.timed_out() {
+            break;
+        }
+    }
+}
+
 fn is_matching_known_write(
-    known_writes: &Mutex<HashMap<PathBuf, KnownWrite>>,
+    service: &WorkspaceService,
     relative: &Path,
     metadata: &FileMetadata,
 ) -> bool {
-    let mut writes = known_writes.lock().expect("known writes lock");
+    await_pending_write(service, relative);
+    let mut writes = service.known_writes.lock().expect("known writes lock");
     writes.retain(|_, write| write.completed_at.elapsed() <= OWN_WRITE_WINDOW);
     matches!(
         writes.get(relative),
@@ -451,5 +522,69 @@ fn sync_directory(directory: &Path) -> io::Result<()> {
     {
         let _ = directory;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod pending_write_tests {
+    use super::*;
+
+    /// The service records a completed write only after `persist` has already
+    /// made the new file visible, so the watcher can observe the change while
+    /// the record is still being produced. Under load — the desktop app was
+    /// mid-pagination — that gap is wide enough for the service's own write to
+    /// be reported as an external change.
+    #[test]
+    fn suppression_waits_for_an_in_flight_write_to_record() {
+        let directory = tempfile::tempdir().expect("temp workspace");
+        let service = WorkspaceService::new(directory.path()).expect("workspace service");
+        let relative = PathBuf::from("proof.md");
+        let observed = FileMetadata {
+            path: "proof.md".to_owned(),
+            sha256: "abc123".to_owned(),
+            mtime_unix_ms: 1_700_000_000_000,
+        };
+
+        // The write is in flight: persist has happened, the record has not landed.
+        service.begin_pending_write(&relative);
+
+        let late = service.clone();
+        let late_relative = relative.clone();
+        let late_metadata = observed.clone();
+        let recorder = thread::spawn(move || {
+            thread::sleep(Duration::from_millis(150));
+            late.record_known_write(late_relative.clone(), &late_metadata);
+            late.finish_pending_write(&late_relative);
+        });
+
+        assert!(
+            is_matching_known_write(&service, &relative, &observed),
+            "an own write must stay suppressed even when the watcher observes it before the record lands"
+        );
+        recorder.join().expect("recorder thread");
+    }
+
+    /// The wait must not swallow genuine external edits: once no write is in
+    /// flight, a change that does not match the recorded write is reported.
+    #[test]
+    fn suppression_still_reports_a_change_that_does_not_match_the_record() {
+        let directory = tempfile::tempdir().expect("temp workspace");
+        let service = WorkspaceService::new(directory.path()).expect("workspace service");
+        let relative = PathBuf::from("proof.md");
+        let written = FileMetadata {
+            path: "proof.md".to_owned(),
+            sha256: "abc123".to_owned(),
+            mtime_unix_ms: 1_700_000_000_000,
+        };
+        service.record_known_write(relative.clone(), &written);
+
+        let external = FileMetadata {
+            sha256: "def456".to_owned(),
+            ..written.clone()
+        };
+        assert!(
+            !is_matching_known_write(&service, &relative, &external),
+            "a genuine external edit must still be reported"
+        );
     }
 }
