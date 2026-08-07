@@ -231,26 +231,25 @@ impl WorkspaceService {
         temporary.as_file_mut().flush()?;
         temporary.as_file().sync_all()?;
         self.ensure_same_directory(parent_relative, &parent_fd, &relative)?;
+
+        // Described before the rename makes it visible. A rename does not change
+        // the file's modification time, so the temporary file already carries the
+        // metadata the watcher will observe. Describing it afterwards left a
+        // window where a failed read would lose the record and the service would
+        // report its own write as an external change.
+        let metadata = metadata_for_file(temporary.reopen()?, &relative)?;
+
         // Registered before persist: once the rename lands the watcher can see
         // the change immediately, and it must not judge it before this write
-        // has finished describing itself.
+        // has been recorded.
         let _pending = self.pending_write(&relative);
+        self.record_known_write(relative.clone(), &metadata);
         temporary
             .persist(&target)
             .map_err(|error| WorkspaceError::Io(error.error))?;
         File::from(rustix::io::dup(&parent_fd).map_err(io::Error::from)?).sync_all()?;
         self.ensure_same_directory(parent_relative, &parent_fd, &relative)?;
 
-        let file = openat2(
-            &parent_fd,
-            file_name,
-            OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW,
-            Mode::empty(),
-            safe_resolve_flags(),
-        )
-        .map_err(io::Error::from)?;
-        let metadata = metadata_for_file(File::from(file), &relative)?;
-        self.record_known_write(relative, &metadata);
         Ok(metadata)
     }
 

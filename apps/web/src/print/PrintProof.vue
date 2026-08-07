@@ -70,8 +70,8 @@ async function paginateDocument(): Promise<void> {
     return
   }
 
-  let mode = result.mode
-  let warning = result.warnings[0]?.message
+  const mode = result.mode
+  const warning = result.warnings[0]?.message
   if (mode === 'pagedjs') {
     pagedTarget.value.replaceChildren(...Array.from(detachedTarget.childNodes))
     pagedTarget.value.querySelectorAll('.pagedjs_page').forEach((page, index) => {
@@ -96,6 +96,7 @@ async function paginateDocument(): Promise<void> {
 async function verifyPlacedPreview(placed: HTMLElement, generationAtPlacement: number): Promise<void> {
   const hiding = await findPagesHidingContentWhenSettled(placed, {
     nextFrame: () => new Promise<void>((resolve) => { window.requestAnimationFrame(() => resolve()) }),
+    afterDelay: (ms) => new Promise<void>((resolve) => { window.setTimeout(resolve, ms) }),
     now: () => window.performance.now(),
     fontsReady: document.fonts?.ready,
   })

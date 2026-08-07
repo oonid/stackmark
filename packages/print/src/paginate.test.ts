@@ -388,3 +388,20 @@ describe('findPagesHidingContentWhenSettled', () => {
       .resolves.toEqual([])
   })
 })
+
+describe('findPagesHidingContentWhenSettled deadline', () => {
+  it('gives up when frames stop arriving', async () => {
+    // requestAnimationFrame does not fire in a hidden window, so a loop that
+    // only checks its deadline after awaiting a frame would never settle.
+    const root = globalThis.document.createElement('div')
+    let time = 0
+    const never = new Promise<void>(() => {})
+
+    await expect(findPagesHidingContentWhenSettled(root, {
+      nextFrame: () => never,
+      now: () => time,
+      afterDelay: async (ms: number) => { time += ms },
+      deadlineMs: 500,
+    })).resolves.toEqual([])
+  })
+})

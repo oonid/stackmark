@@ -159,6 +159,8 @@ export function findPagesHidingContent(target: HTMLElement): number[] {
 export interface SettleOptions {
   nextFrame: () => Promise<void>
   now: () => number
+  /** Resolves after roughly the given delay. Bounds the wait when frames stall. */
+  afterDelay?: (ms: number) => Promise<void>
   fontsReady?: Promise<unknown>
   deadlineMs?: number
 }
@@ -182,8 +184,14 @@ export async function findPagesHidingContentWhenSettled(
   for (;;) {
     const hiding = findPagesHidingContent(root)
     if (hiding.length > 0) return hiding
-    if (options.now() - start >= deadlineMs) return []
-    await options.nextFrame()
+    const remaining = deadlineMs - (options.now() - start)
+    if (remaining <= 0) return []
+    // requestAnimationFrame does not fire in a hidden window, so the deadline
+    // has to be able to win the race rather than only being checked between
+    // frames.
+    await (options.afterDelay
+      ? Promise.race([options.nextFrame(), options.afterDelay(remaining)])
+      : options.nextFrame())
   }
 }
 
