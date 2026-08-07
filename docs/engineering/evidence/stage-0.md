@@ -118,7 +118,28 @@ Independently verified rather than eyeballed: file hashes were recomputed with `
 
 Defects 1 and 2 are correctness bugs to fix before Stage 1. Defects 3 and 4 are engine limitations to record as deviations, and both constrain the phase-one Print Studio design: page geometry is user-selected on Linux rather than document-controlled, and running headers or page numbers must be composed into the document body if they are required at all.
 
-Still outstanding for Task 6: fixes for defects 1 and 2, then a scoped re-review, then ADR 0001.
+### Defect 2 fixed and verified on the host (2026-08-07)
+
+The cause was not suppression logic but a feedback loop. Describing a change means opening the file and hashing it, and on Linux that read is itself reported by the watcher, so it woke itself once per debounce against a file nothing had touched. The own-write record absorbed the repeats for two seconds, then expired, after which every cycle announced the unchanged file as an external edit. One save produced 888 event batches: 26 suppressed, 862 emitted. Access events no longer contribute paths.
+
+Host verification: saving produced no external-change event, and a subsequent Kate edit produced hash `15c3552d…`, which matches the file on disk exactly and differs from the save hash. Suppression works without going deaf to genuine edits.
+
+Two diagnoses preceded this one and both were wrong: that the write and watcher were not sharing the record map, and that the record landed after the watcher judged the event. The captured trace disproved the second directly — the record was present and 75 ms old, and the first event was correctly suppressed. Only logging what the watcher actually compared found the loop.
+
+### Defect 1 re-measured: the preview is complete
+
+Measuring the running WebKitGTK app rather than reasoning about it showed the remainder of the split sentence present on page 2, at the left edge of the page box, `visibility: visible`, and first in reading order. Page 1 ends 19 px above its box bottom. The preview breaks mid-paragraph a few words earlier than the PDF because Paged.js applies the stylesheet's 14/16/18 mm margins while the GTK dialog imposes its own, near 6.5 mm, so the two have different line counts per page. That is a normal page break, not content loss.
+
+The earlier observation during the host smoke was different: the remainder was absent and page 2 began at the display math. Both observations were made on builds containing the same layout-affecting commits, so the difference is unexplained. Treat the failure as intermittent rather than resolved — most plausibly a readiness race, since fonts and the diagram image influence where the break falls.
+
+Two independent guards now cover it, neither of which fires on correct output in either engine:
+
+- a text comparison, which detects content the engine discards outright;
+- a geometry check, which detects content laid out but left outside the page box, where the text is still in the document and a text comparison cannot see it.
+
+Both demote the preview to the plain-CSS fallback rather than presenting a page with a hole in it. The text comparison alone was written first and would not have caught the geometry case; the geometry check alone would not catch outright loss.
+
+Still outstanding for Task 6: a scoped re-review, then ADR 0001.
 
 Current unresolved print-preview evidence (superseded by the analysis above; retained for history):
 
