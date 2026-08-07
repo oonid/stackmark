@@ -140,6 +140,36 @@ test('renders screen preview pages at the stylesheet A4 geometry with generated 
   expect(geometry.pageCounter).toMatch(/counter\(pages\)/)
 })
 
+test('carries every sentence of the source into the paged preview', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByTestId('print-pagination-status')).toContainText(/pages ready/i)
+
+  const paged = await page.getByTestId('print-document').evaluate((root) =>
+    Array.from(root.querySelectorAll<HTMLElement>('.pagedjs_page .pagedjs_page_content'))
+      .map((element) => element.innerText)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim())
+
+  // A break must split text, never discard it. Losing a break token silently
+  // drops the content it pointed at, which a page-count assertion cannot see.
+  const required = [
+    'This source document seeds the shared Stage 0 editor shell with inline math',
+    'The print proof deliberately repeats ordinary editorial prose so the browser must create multiple A4 pages.',
+    'This sentence is representative of the Markdown content a StackEdit author can review before opening the print dialog.',
+    'Documentation is rarely a single screen.',
+    'When a page is nearly full, a heading should travel with the content that follows it.',
+    'The same policy applies to long-form notes.',
+    'An author might describe an experiment, explain its constraints, and include a table of findings.',
+    'Reliable fallback behavior matters as much as the happy path.',
+    'This paragraph supplies further continuous prose for the page-flow check.',
+    'The local application bundle contains the fonts required by the mathematical expression below, so a disconnected review remains representative of the desktop target.',
+    'The diagram below is rendered in the opaque Mermaid iframe and then passed only as separately sanitized static SVG.',
+  ]
+  const missing = required.filter((sentence) => !paged.includes(sentence))
+  expect(missing).toEqual([])
+})
+
 test('keeps application shell chrome out of the rebuilt page ancestors', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByTestId('print-pagination-status')).toContainText(/pages ready/i)

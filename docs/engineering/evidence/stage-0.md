@@ -91,7 +91,34 @@ Fresh full matrix, all green:
 - `bash tests/tooling/dev-wrapper.test.sh` — PASS.
 - `git diff --check` — PASS.
 
-Still outstanding for Task 6: the KDE host re-smoke with both processes restarted rather than hot-reloaded, then a scoped re-review, then ADR 0001.
+## KDE host re-smoke (2026-08-07)
+
+Environment: KDE neon, WebKitGTK **2.52.3**, rustc 1.88.0, tauri-cli **2.10.1** (the plan named 2.11.4 — a deviation, not a blocker for dev mode). Both processes were started fresh: the Docker frontend through `./dev frontend-dev`, then host-native `cargo tauri dev`. `tauri.conf.json` declares no `beforeDevCommand`, so no host Node or pnpm was invoked.
+
+Independently verified rather than eyeballed: file hashes were recomputed with `sha256sum`, modification times read with `stat`, and every PDF measured with `pdfinfo`, `pdftotext`, `pdffonts` and content-stream inspection.
+
+### Gates that passed
+
+- Window launch and the shared Vue UI under WebKitGTK, with the editor, preview, and both proof cards.
+- KaTeX and isolated Mermaid rendering under the Tauri dev CSP, using the nonce-based external renderer.
+- Paged.js screen preview reported two pages, so the break-token patch works under WebKitGTK, not only Chromium.
+- Folder selection through the official dialog with `core:default` removed.
+- Atomic write with **truthful metadata**: the UI reported SHA-256 `c1e46f75…` and mtime `1785945827993`; the file on disk hashed identically and its mtime of `1785945827993994547` ns truncates to exactly that millisecond value.
+- External-change detection through a Kate save, which uses the same write-temp-then-rename pattern as the service. The reported hash `91390eee…` matched the file on disk exactly.
+- Native print content: complete text, the Mermaid diagram as **vector** path operations rather than a raster image, KaTeX fonts embedded as subsets, and the light-paper Mermaid palette present in the printed output (node fill `#f8fafc`, stroke `#475569`, no pure black). This machine-verifies the dark-mode print fix.
+- A4 output when selected in the dialog: 595 × 842 pt, two pages, and zero words outside the page box.
+- Offline behaviour: with external networking disabled, editing, KaTeX, Mermaid, and pagination all worked, and the exported PDF was structurally identical to the online one — same page count, geometry, embedded fonts, palette, and vector-operation count. The production bundle makes no remote `fetch`, XHR, or `importScripts` call; its 545 external URLs are inert `mdn-data` documentation strings reachable only through the `css-tree` dependency of Paged.js.
+
+### Defects found
+
+1. **Preview drops content at a page break under WebKitGTK.** Preview page 1 ended at "The local application" and page 2 began at the display math, losing "bundle contains the fonts required by the mathematical expression below, so a disconnected review remains representative of the desktop target." The PDF contains that sentence, so only the Paged.js preview is affected. A browser test asserting every source sentence survives into the preview passes under Chromium, so this is engine divergence reached through the patched break-token path. Silent content loss in a preview is worse than a visible fallback.
+2. **The service's own write is reported as an external change.** Immediately after saving, the external-change panel showed `stage-zero-proof.md` with the save's own hash, before any external edit. This is review finding 3 again. The suppression code compares path, SHA-256, mtime and a two-second window against a map shared through `Arc<Mutex<…>>`, and a Rust test asserting this exact behaviour passes, so the test does not reproduce the real command sequence.
+3. **WebKitGTK ignores `@page` geometry.** The default export was US Letter at 612 × 792 pt despite `@page { size: A4 portrait }`, and margins measured about 6.3 / 6.5 / 14.3 / 10.6 mm rather than the declared 14 / 16 / 18 mm. Paper and margins are governed by the GTK dialog. A4 is reachable only by selecting it there. Chromium honours the rule, so the earlier "native print is A4-correct" claim held for Chromium only.
+4. **`@page` margin boxes never reach printed output.** The exported PDF contains no running header and no page counter; "StackEdit print proof" appears once, as the document heading. No browser implements CSS margin boxes, so the Paged.js preview displays running titles and `Page N of M` that the real print output cannot reproduce.
+
+Defects 1 and 2 are correctness bugs to fix before Stage 1. Defects 3 and 4 are engine limitations to record as deviations, and both constrain the phase-one Print Studio design: page geometry is user-selected on Linux rather than document-controlled, and running headers or page numbers must be composed into the document body if they are required at all.
+
+Still outstanding for Task 6: fixes for defects 1 and 2, then a scoped re-review, then ADR 0001.
 
 Current unresolved print-preview evidence (superseded by the analysis above; retained for history):
 
