@@ -24,13 +24,14 @@ case "$command_name" in
   frontend-build) run_pnpm build ;;
   unit) run_pnpm unit ;;
   e2e) run_compose run --rm browser pnpm e2e ;;
+  desktop-build) run_compose run --rm tauri-builder cargo tauri build --bundles deb ;;
   lint) run_pnpm lint ;;
   install) run_pnpm install --frozen-lockfile ;;
   install-update) run_pnpm install ;;
   shell) run_compose run --rm js bash ;;
   versions) run_pnpm versions ;;
   *)
-    printf '%s\n' 'usage: ./dev {frontend-dev|frontend-build|unit|e2e|lint|install|install-update|shell|versions}' >&2
+    printf '%s\n' 'usage: ./dev {frontend-dev|frontend-build|desktop-build|unit|e2e|lint|install|install-update|shell|versions}' >&2
     exit 64
     ;;
 esac

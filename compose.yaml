@@ -35,7 +35,27 @@ services:
       - .:/workspace
       - pnpm-store:/pnpm/store
       - node-modules:/workspace/node_modules
+  tauri-builder:
+    build:
+      context: .
+      dockerfile: docker/tauri-builder.Dockerfile
+      args:
+        HOST_UID: "${HOST_UID:-1000}"
+        HOST_GID: "${HOST_GID:-1000}"
+    working_dir: /workspace/apps/desktop
+    environment:
+      HOME: /tmp/stackedit-builder-home
+      PNPM_HOME: /tmp/stackedit-builder-pnpm
+      CARGO_HOME: /cargo
+    volumes:
+      - .:/workspace
+      - pnpm-store:/pnpm/store
+      - node-modules:/workspace/node_modules
+      - cargo-registry:/cargo/registry
+      - cargo-git:/cargo/git
 
 volumes:
   pnpm-store:
   node-modules:
+  cargo-registry:
+  cargo-git:

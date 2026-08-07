@@ -43,6 +43,14 @@ grep -Fx "$expected_e2e_args" "$STACKEDIT_DOCKER_ARGS"
 
 (
   cd "$repo_root/tests"
+  PATH="$test_dir:$PATH" "$repo_root/dev" desktop-build
+)
+
+expected_desktop_args="compose --project-directory $repo_root -f $repo_root/compose.yaml run --rm tauri-builder cargo tauri build --bundles deb"
+grep -Fx "$expected_desktop_args" "$STACKEDIT_DOCKER_ARGS"
+
+(
+  cd "$repo_root/tests"
   PATH="$test_dir:$PATH" STACKEDIT_IN_BUILDER=1 PNPM_BIN="$test_dir/pnpm" \
     "$repo_root/dev" frontend-build
 )
@@ -65,6 +73,17 @@ grep -F 'pnpm --version | grep -Fx' "$repo_root/docker/frontend.Dockerfile"
 grep -F 'USER stackedit' "$repo_root/docker/frontend.Dockerfile"
 grep -F 'mkdir -p /workspace/node_modules /pnpm/store' "$repo_root/docker/frontend.Dockerfile"
 grep -F 'chown -R stackedit:stackedit /workspace /pnpm' "$repo_root/docker/frontend.Dockerfile"
+
+grep -Fx 'FROM ubuntu:24.04' "$repo_root/docker/tauri-builder.Dockerfile"
+grep -F 'ENV STACKEDIT_IN_BUILDER=1' "$repo_root/docker/tauri-builder.Dockerfile"
+grep -F -- '--default-toolchain 1.88.0' "$repo_root/docker/tauri-builder.Dockerfile"
+grep -F 'tauri-cli@2.11.4' "$repo_root/docker/tauri-builder.Dockerfile"
+grep -F 'corepack prepare pnpm@11.20.0 --activate' "$repo_root/docker/tauri-builder.Dockerfile"
+grep -F 'libwebkit2gtk-4.1-dev' "$repo_root/docker/tauri-builder.Dockerfile"
+grep -F 'node --version | grep -Fx' "$repo_root/docker/tauri-builder.Dockerfile"
+
+grep -Fx '  tauri-builder:' "$repo_root/compose.yaml"
+grep -Fx '      dockerfile: docker/tauri-builder.Dockerfile' "$repo_root/compose.yaml"
 
 grep -Fx '      dockerfile: docker/frontend.Dockerfile' "$repo_root/compose.yaml"
 grep -Fx '      - "127.0.0.1:1420:1420"' "$repo_root/compose.yaml"
