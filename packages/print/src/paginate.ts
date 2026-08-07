@@ -111,6 +111,41 @@ function normalizeForComparison(text: string): string {
   return text.toLowerCase().replace(/\s+/g, '')
 }
 
+/** Selector for elements that carry readable content on a page. */
+const CONTENT_SELECTOR = 'p,h1,h2,h3,h4,h5,h6,pre,td,th,li,blockquote,figure,img,.katex,.mermaid-static'
+const OVERFLOW_TOLERANCE_PX = 1
+
+/**
+ * How far the furthest item escapes the page box, in pixels.
+ *
+ * An engine may lay content out and then leave it in a clipped column beside
+ * the page instead of moving it to the next one. The text is present in the
+ * document, so comparing text cannot see it, but a reader cannot read it.
+ */
+export function worstHiddenOverflow(
+  box: { right: number; bottom: number },
+  items: Array<{ right: number; bottom: number }>,
+): number {
+  let worst = 0
+  for (const item of items) {
+    worst = Math.max(worst, item.right - box.right, item.bottom - box.bottom)
+  }
+  return worst
+}
+
+function findPagesHidingContent(target: HTMLElement): number[] {
+  const pages = Array.from(target.querySelectorAll<HTMLElement>('.pagedjs_page_content'))
+  const hiding: number[] = []
+  pages.forEach((content, index) => {
+    const box = content.getBoundingClientRect()
+    const items = Array.from(content.querySelectorAll<HTMLElement>(CONTENT_SELECTOR))
+      .filter((element) => element.tagName === 'IMG' || (element.textContent ?? '').trim().length > 0)
+      .map((element) => element.getBoundingClientRect())
+    if (worstHiddenOverflow(box, items) > OVERFLOW_TOLERANCE_PX) hiding.push(index + 1)
+  })
+  return hiding
+}
+
 function readPagedText(target: HTMLElement): string {
   const pages = target.querySelectorAll('.pagedjs_page_content')
   if (pages.length === 0) return target.textContent ?? ''
@@ -138,7 +173,13 @@ export async function paginate(options: PaginateOptions): Promise<PaginationResu
     if (normalizeForComparison(sourceText).length > 0) {
       const dropped = findDroppedText(sourceText, readPagedText(options.target))
       if (dropped.length > 0) {
-        throw new IncompletePaginationError(dropped)
+        throw new IncompletePaginationError(`dropped content near "${dropped[0]}"`)
+      }
+      const hiding = findPagesHidingContent(options.target)
+      if (hiding.length > 0) {
+        throw new IncompletePaginationError(
+          `hides content outside the page box on page ${hiding.join(', ')}`,
+        )
       }
     }
     return { mode: 'pagedjs', pageCount: flow.total ?? countPages(options.target), warnings: [] }
@@ -150,7 +191,7 @@ export async function paginate(options: PaginateOptions): Promise<PaginationResu
         pageCount: 0,
         warnings: [{
           code: 'PAGEDJS_INCOMPLETE',
-          message: `Paged.js dropped content near "${cause.dropped[0]}"; using plain CSS.`,
+          message: `Paged.js ${cause.reason}; using plain CSS.`,
         }],
       }
     }
@@ -169,8 +210,8 @@ export async function paginate(options: PaginateOptions): Promise<PaginationResu
 }
 
 class IncompletePaginationError extends Error {
-  constructor(readonly dropped: string[]) {
-    super(`pagination dropped source content near "${dropped[0]}"`)
+  constructor(readonly reason: string) {
+    super(`pagination ${reason}`)
   }
 }
 
