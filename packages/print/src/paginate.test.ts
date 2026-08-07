@@ -2,9 +2,52 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_PRINT_SETTINGS,
   awaitPrintResources,
+  findDroppedText,
   paginate,
   printPolicy,
 } from './paginate'
+
+describe('findDroppedText', () => {
+  const long = (text: string) => text.repeat(4)
+
+  it('reports nothing when the paged output carries all of the source text', () => {
+    const source = long('The local application bundle contains the fonts required. ')
+
+    expect(findDroppedText(source, `Page 1 of 2 ${source}`)).toEqual([])
+  })
+
+  it('reports the missing run when a break discards a sentence', () => {
+    const kept = long('Alpha paragraph retained. ')
+    const source = `${kept}Omega paragraph discarded entirely and never rendered anywhere.`
+
+    const dropped = findDroppedText(source, kept)
+
+    expect(dropped.length).toBeGreaterThan(0)
+    expect(dropped.join('')).toContain('omega')
+  })
+
+  it('ignores whitespace differences where adjacent elements run together', () => {
+    // textContent yields "KaTeXproved" for adjacent cells in one tree and
+    // "KaTeX proved" in another; that is not content loss.
+    const source = long('KaTeXproved Paged.js bounded fallback Mermaid static SVG ')
+    const paged = source.replace(/KaTeXproved/g, 'KaTeX proved')
+
+    expect(findDroppedText(source, paged)).toEqual([])
+  })
+
+  it('tolerates a word split across a page boundary', () => {
+    const source = long('representative of the desktop target for review ')
+    const split = source.replace('representative', 'representa tive')
+
+    expect(findDroppedText(source, split)).toEqual([])
+  })
+
+  it('tolerates text duplicated into an overflow area', () => {
+    const source = long('alpha beta gamma delta epsilon ')
+
+    expect(findDroppedText(source, `${source} ${source}`)).toEqual([])
+  })
+})
 
 describe('print policy', () => {
   it('uses typed A4 portrait defaults without accepting CSS strings', () => {
@@ -52,6 +95,61 @@ describe('pagination adapter', () => {
     })
 
     expect(events).toEqual(['katex', 'mermaid'])
+    expect(result).toEqual({ mode: 'pagedjs', pageCount: 2, warnings: [] })
+  })
+
+  it('falls back to plain CSS when pagination silently drops source content', async () => {
+    // WebKitGTK reaches a break-token path that discards the content it points
+    // at. The pages that survive still look plausible, so only comparing the
+    // paged text against the source can catch it.
+    const document = {
+      fonts: { ready: Promise.resolve() },
+      querySelectorAll: () => [],
+    } as unknown as Document
+    const source = globalThis.document.createElement('article')
+    source.textContent = 'Alpha paragraph retained. Omega paragraph discarded entirely.'
+    const target = globalThis.document.createElement('div')
+
+    const result = await paginate({
+      document,
+      source,
+      target,
+      preview: async (_source, into) => {
+        const page = globalThis.document.createElement('div')
+        page.className = 'pagedjs_page_content'
+        page.textContent = 'Alpha paragraph retained.'
+        into.appendChild(page)
+        return { total: 1 }
+      },
+    })
+
+    expect(result.mode).toBe('plain-css')
+    expect(result.warnings[0]?.code).toBe('PAGEDJS_INCOMPLETE')
+    expect(result.warnings[0]?.message).toMatch(/omega|content/i)
+  })
+
+  it('keeps the Paged.js result when every source word survives', async () => {
+    const document = {
+      fonts: { ready: Promise.resolve() },
+      querySelectorAll: () => [],
+    } as unknown as Document
+    const source = globalThis.document.createElement('article')
+    source.textContent = 'Alpha paragraph retained. Omega paragraph retained.'
+    const target = globalThis.document.createElement('div')
+
+    const result = await paginate({
+      document,
+      source,
+      target,
+      preview: async (_source, into) => {
+        const page = globalThis.document.createElement('div')
+        page.className = 'pagedjs_page_content'
+        page.textContent = 'Alpha paragraph retained. Omega paragraph retained.'
+        into.appendChild(page)
+        return { total: 2 }
+      },
+    })
+
     expect(result).toEqual({ mode: 'pagedjs', pageCount: 2, warnings: [] })
   })
 

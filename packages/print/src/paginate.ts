@@ -17,7 +17,7 @@ export interface PrintPolicy {
 }
 
 export interface PaginationWarning {
-  code: 'PAGEDJS_FAILED' | 'PAGEDJS_TIMEOUT'
+  code: 'PAGEDJS_FAILED' | 'PAGEDJS_TIMEOUT' | 'PAGEDJS_INCOMPLETE'
   message: string
 }
 
@@ -76,8 +76,53 @@ export async function awaitPrintResources(source: HTMLElement, document: Documen
   ])
 }
 
+const COMPARISON_CHUNK = 40
+
+/**
+ * Runs of source text that the paged output does not contain.
+ *
+ * Both sides have all whitespace removed before comparison, which makes the
+ * check immune to three things that are not content loss: adjacent elements
+ * whose text runs together in one tree but not the other (`<td>a</td><td>b</td>`
+ * yields `ab`), a word split across a page boundary, and text duplicated into
+ * an engine's overflow area. Genuine loss removes a run of characters outright,
+ * so the chunk containing it stops appearing anywhere in the output.
+ */
+export function findDroppedText(sourceText: string, pagedText: string): string[] {
+  const source = normalizeForComparison(sourceText)
+  const paged = normalizeForComparison(pagedText)
+  if (source.length === 0) return []
+  if (source.length <= COMPARISON_CHUNK) {
+    return paged.includes(source) ? [] : [source]
+  }
+
+  const missing: string[] = []
+  for (let start = 0; start + COMPARISON_CHUNK <= source.length; start += COMPARISON_CHUNK) {
+    const chunk = source.slice(start, start + COMPARISON_CHUNK)
+    if (!paged.includes(chunk)) missing.push(chunk)
+  }
+  // The tail is shorter than a chunk, so check it inside a full-width window.
+  const tail = source.slice(-COMPARISON_CHUNK)
+  if (!paged.includes(tail)) missing.push(tail)
+  return [...new Set(missing)]
+}
+
+function normalizeForComparison(text: string): string {
+  return text.toLowerCase().replace(/\s+/g, '')
+}
+
+function readPagedText(target: HTMLElement): string {
+  const pages = target.querySelectorAll('.pagedjs_page_content')
+  if (pages.length === 0) return target.textContent ?? ''
+  return Array.from(pages)
+    .map((page) => page.textContent ?? '')
+    .join(' ')
+}
+
 export async function paginate(options: PaginateOptions): Promise<PaginationResult> {
   const timeoutMs = options.timeoutMs ?? 10_000
+  // Captured before pagination, because the engine consumes the source tree.
+  const sourceText = options.source.textContent ?? ''
   try {
     const flow = await withTimeout(async () => {
       await awaitPrintResources(options.source, options.document)
@@ -89,9 +134,26 @@ export async function paginate(options: PaginateOptions): Promise<PaginationResu
     },
       timeoutMs,
     )
+    // With no source text there is nothing to lose, and nothing to read.
+    if (normalizeForComparison(sourceText).length > 0) {
+      const dropped = findDroppedText(sourceText, readPagedText(options.target))
+      if (dropped.length > 0) {
+        throw new IncompletePaginationError(dropped)
+      }
+    }
     return { mode: 'pagedjs', pageCount: flow.total ?? countPages(options.target), warnings: [] }
   } catch (cause) {
     options.target.classList.add('pagedjs-failed')
+    if (cause instanceof IncompletePaginationError) {
+      return {
+        mode: 'plain-css',
+        pageCount: 0,
+        warnings: [{
+          code: 'PAGEDJS_INCOMPLETE',
+          message: `Paged.js dropped content near "${cause.dropped[0]}"; using plain CSS.`,
+        }],
+      }
+    }
     const timedOut = cause instanceof PaginationTimeoutError
     return {
       mode: 'plain-css',
@@ -103,6 +165,12 @@ export async function paginate(options: PaginateOptions): Promise<PaginationResu
           : `Paged.js pagination failed (${cause instanceof Error ? cause.message : 'unknown error'}); using plain CSS.`,
       }],
     }
+  }
+}
+
+class IncompletePaginationError extends Error {
+  constructor(readonly dropped: string[]) {
+    super(`pagination dropped source content near "${dropped[0]}"`)
   }
 }
 
