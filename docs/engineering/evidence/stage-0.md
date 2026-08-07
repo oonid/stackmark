@@ -155,7 +155,19 @@ The practical consequence for Stage 0 is that **the Paged.js page preview does n
 
 This should be recorded in ADR 0001 as a named deviation rather than presented as a working gate: the desktop application has no page-accurate on-screen preview, and phase one's Print Studio cannot promise one until an engine passes this gate on WebKitGTK.
 
-Still outstanding for Task 6: a scoped re-review, then ADR 0001.
+### Task 6 re-review findings carried into Stage 1 (2026-08-08)
+
+A scoped re-review of `18e4a58a..565f8e7f` produced eight findings. Three were fixed: the own-write record could be lost if describing the file failed after the rename, the settle loop could hang because its deadline was only checked between animation frames, and two values were needlessly mutable. Two were recorded as scope decisions rather than defects: `read_markdown` is permitted but never invoked by the application, and the print settings type is decorative because `printPolicy` discards its argument and A4 is declared independently in TypeScript and in CSS with nothing connecting them.
+
+The remaining three are not Stage 0 blockers and are carried forward:
+
+1. **The watcher hashes an entire file on every event, and can block for up to two seconds.** Describing a change reads and hashes the whole file, and `await_pending_write` blocks the watcher thread until an in-flight write to that path has been recorded. Both are acceptable for a single small proof file and neither is acceptable for a real workspace. Stage 1 should hash incrementally or key suppression on size and modification time first, and should not block the shared watcher thread on a per-path condition.
+2. **Replacing a watched file with a symlink is silently ignored.** `metadata_for_relative` opens with `NOFOLLOW`, so the event is dropped with no signal to the interface. Refusing to follow the symlink is correct; discarding the event without telling anyone is not, because the user sees a file that has changed and an application that says nothing. Stage 1 should surface a distinct rejected-change event, and it needs a test — this behaviour currently has neither.
+3. **Preview verification runs overlap.** Each pagination starts its own two-second polling loop, so rapid editing leaves several running at once. The generation guard keeps the result correct, but the work is wasted and grows with typing speed. Stage 1 should cancel the previous verification when a new pagination starts.
+
+The review was performed by the author of the code under review, which is weaker than the independent review the plan asks for. Both findings that were declined are judgement calls about scope, which is exactly the category an author is least able to review impartially. An independent pass is still owed.
+
+Still outstanding for Task 6: an independent re-review.
 
 Current unresolved print-preview evidence (superseded by the analysis above; retained for history):
 
