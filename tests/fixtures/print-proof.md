@@ -1,8 +1,8 @@
-# StackEdit print proof
+# StackMark print proof
 
 This source document seeds the shared Stage 0 editor shell with inline math $E = mc^2$.
 
-The print proof deliberately repeats ordinary editorial prose so the browser must create multiple A4 pages. A calm, readable page should keep paragraphs together where possible while allowing long technical documents to flow naturally across page boundaries. This sentence is representative of the Markdown content a StackEdit author can review before opening the print dialog.
+The print proof deliberately repeats ordinary editorial prose so the browser must create multiple A4 pages. A calm, readable page should keep paragraphs together where possible while allowing long technical documents to flow naturally across page boundaries. This sentence is representative of the Markdown content a StackMark author can review before opening the print dialog.
 
 Documentation is rarely a single screen. It carries decisions, examples, tables, equations, and diagrams that need to remain legible when read on paper. The proof keeps its source simple and relies on the existing Markdown sanitizer, KaTeX renderer, and isolated Mermaid renderer before anything reaches the print-only document.
 

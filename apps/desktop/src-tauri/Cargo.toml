@@ -1,10 +1,10 @@
 [package]
-name = "stackedit-desktop"
+name = "stackmark-desktop"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "stackedit_desktop"
+name = "stackmark_desktop"
 path = "src/lib.rs"
 crate-type = ["lib", "cdylib", "staticlib"]
 

@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue'
-import { DEFAULT_PRINT_SETTINGS, findPagesHidingContentWhenSettled, installNativePageRule, paginate } from '@stackedit/print'
-import '@stackedit/print/print-document.css'
-import '@stackedit/print/print-shell.css'
+import { DEFAULT_PRINT_SETTINGS, findPagesHidingContentWhenSettled, installNativePageRule, paginate } from '@stackmark/print'
+import '@stackmark/print/print-document.css'
+import '@stackmark/print/print-shell.css'
 // The document stylesheet as text. Paged.js reads @page geometry only from the
 // stylesheets it is handed, never from the live document. The shell stylesheet
 // is deliberately withheld: Paged.js de-mediates @media print, which would
 // apply the off-screen staging `display: none` rule to the tree it lays out.
-import printDocumentCssText from '@stackedit/print/print-document.css?inline'
-import type { RenderedMarkdown } from '@stackedit/markdown'
+import printDocumentCssText from '@stackmark/print/print-document.css?inline'
+import type { RenderedMarkdown } from '@stackmark/markdown'
 
 const props = defineProps<{
   rendered: RenderedMarkdown
@@ -187,7 +187,7 @@ function hydrateStaticPrintHtml(html: string, mermaidSvg: Readonly<Record<string
     <article
       ref="printDocument"
       data-testid="print-document"
-      class="stackedit-print-document"
+      class="stackmark-print-document"
       :class="{
         'pagedjs-ready': paginationState === 'pagedjs',
         'pagedjs-failed': paginationState === 'plain-css',
@@ -195,7 +195,7 @@ function hydrateStaticPrintHtml(html: string, mermaidSvg: Readonly<Record<string
       :data-page-size="DEFAULT_PRINT_SETTINGS.pageSize"
     >
       <!-- eslint-disable vue/no-v-html -- only sanitized Markdown and separately sanitized static Mermaid SVG enter here. -->
-      <div ref="printSource" class="print-source stackedit-print-document" v-html="printableHtml" />
+      <div ref="printSource" class="print-source stackmark-print-document" v-html="printableHtml" />
       <div ref="pagedTarget" class="paged-output" aria-label="Paginated print pages" />
     </article>
     <div ref="stagingHost" class="pagination-staging" aria-hidden="true" />

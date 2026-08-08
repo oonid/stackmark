@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "StackEdit Modern",
+  "productName": "stackmark",
   "version": "0.1.0-stage0",
-  "identifier": "org.stackedit.modern",
+  "identifier": "org.stackmark.desktop",
   "build": {
     "devUrl": "http://localhost:1420",
     "frontendDist": "../../web/dist",
@@ -12,7 +12,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "StackEdit Modern \u2014 Stage 0",
+        "title": "StackMark \u2014 Stage 0",
         "width": 1180,
         "height": 820,
         "minWidth": 720,
@@ -33,7 +33,13 @@
       "../../../chrome-app/icon-512.png"
     ],
     "category": "Productivity",
-    "shortDescription": "StackEdit Stage 0 feasibility build",
-    "longDescription": "Stage 0 vertical slice of the StackEdit rewrite: Markdown rendering with KaTeX and isolated Mermaid, scoped workspace file access, and system printing."
-  }
+    "shortDescription": "StackMark Stage 0 feasibility build",
+    "longDescription": "StackMark, a fork of StackEdit. Stage 0 vertical slice: Markdown rendering with KaTeX and isolated Mermaid, scoped workspace file access, and system printing.",
+    "linux": {
+      "deb": {
+        "desktopTemplate": "stackmark.desktop"
+      }
+    }
+  },
+  "mainBinaryName": "stackmark"
 }

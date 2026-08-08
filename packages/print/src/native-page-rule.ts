@@ -1,4 +1,4 @@
-export const NATIVE_PAGE_RULE_ATTRIBUTE = 'data-stackedit-native-page'
+export const NATIVE_PAGE_RULE_ATTRIBUTE = 'data-stackmark-native-page'
 
 /**
  * Returns the top-level `@page` block's geometry declarations, or null when the

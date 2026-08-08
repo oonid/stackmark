@@ -59,13 +59,13 @@
   box-shadow: none !important;
 }
 
-.stackedit-print-document.pagedjs-ready .print-source,
-.stackedit-print-document.pagedjs-failed .paged-output {
+.stackmark-print-document.pagedjs-ready .print-source,
+.stackmark-print-document.pagedjs-failed .paged-output {
   display: none !important;
 }
 
-.stackedit-print-document.pagedjs-ready .paged-output,
-.stackedit-print-document.pagedjs-failed .print-source {
+.stackmark-print-document.pagedjs-ready .paged-output,
+.stackmark-print-document.pagedjs-failed .print-source {
   display: block !important;
 }
 
@@ -103,15 +103,15 @@
     display: none !important;
   }
 
-  .stackedit-print-document.pagedjs-ready > .print-source,
-  .stackedit-print-document.pagedjs-failed > .print-source,
-  .stackedit-print-document:not(.pagedjs-ready):not(.pagedjs-failed) > .print-source {
+  .stackmark-print-document.pagedjs-ready > .print-source,
+  .stackmark-print-document.pagedjs-failed > .print-source,
+  .stackmark-print-document:not(.pagedjs-ready):not(.pagedjs-failed) > .print-source {
     display: block !important;
   }
 
-  .stackedit-print-document.pagedjs-ready > .paged-output,
-  .stackedit-print-document.pagedjs-failed > .paged-output,
-  .stackedit-print-document:not(.pagedjs-ready):not(.pagedjs-failed) > .paged-output {
+  .stackmark-print-document.pagedjs-ready > .paged-output,
+  .stackmark-print-document.pagedjs-failed > .paged-output,
+  .stackmark-print-document:not(.pagedjs-ready):not(.pagedjs-failed) > .paged-output {
     display: none !important;
   }
 }

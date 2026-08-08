@@ -12,7 +12,7 @@ describe('print stylesheet boundary', () => {
   it('gives the document stylesheet the page geometry Paged.js needs', () => {
     expect(documentCss).toContain('@page')
     expect(documentCss).toContain('size: A4 portrait')
-    expect(documentCss).toContain('.stackedit-print-document')
+    expect(documentCss).toContain('.stackmark-print-document')
   })
 
   it('keeps app-shell rules out of the stylesheet handed to Paged.js', () => {

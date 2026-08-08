@@ -3,7 +3,7 @@ import {
   MERMAID_PROTOCOL_VERSION,
   isMermaidRenderRequest,
   type MermaidRenderResponse,
-} from '@stackedit/markdown/mermaid/protocol'
+} from '@stackmark/markdown/mermaid/protocol'
 
 mermaid.initialize({
   startOnLoad: false,
@@ -16,7 +16,7 @@ window.addEventListener('message', async (event: MessageEvent<unknown>) => {
   if (event.source !== window.parent || !isMermaidRenderRequest(event.data)) return
 
   const response: MermaidRenderResponse = {
-    type: 'stackedit:mermaid:result',
+    type: 'stackmark:mermaid:result',
     version: MERMAID_PROTOCOL_VERSION,
     id: event.data.id,
   }

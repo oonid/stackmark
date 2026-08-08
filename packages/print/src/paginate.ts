@@ -7,7 +7,7 @@ export interface PrintSettings {
 }
 
 export interface PrintPolicy {
-  pageClass: 'stackedit-print-document'
+  pageClass: 'stackmark-print-document'
   imageMaxWidth: '100%'
   imageMaxHeight: '240mm'
   codeWhiteSpace: 'pre-wrap'
@@ -49,12 +49,12 @@ export const DEFAULT_PRINT_SETTINGS: PrintSettings = {
   pageSize: 'A4',
   orientation: 'portrait',
   margins: { top: '16mm', right: '14mm', bottom: '18mm', left: '14mm' },
-  runningTitle: 'StackEdit print proof',
+  runningTitle: 'StackMark print proof',
   pageCounter: 'Page {{page}} of {{pages}}',
 }
 
 const printPolicyValue: PrintPolicy = {
-  pageClass: 'stackedit-print-document',
+  pageClass: 'stackmark-print-document',
   imageMaxWidth: '100%',
   imageMaxHeight: '240mm',
   codeWhiteSpace: 'pre-wrap',

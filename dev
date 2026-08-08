@@ -13,7 +13,7 @@ run_compose() {
 }
 
 run_pnpm() {
-  if [ "${STACKEDIT_IN_BUILDER:-0}" = "1" ]; then
+  if [ "${STACKMARK_IN_BUILDER:-0}" = "1" ]; then
     exec "$pnpm_bin" "$@"
   fi
   run_compose run --rm js pnpm "$@"

@@ -13,7 +13,7 @@ describe('desktop proof gateway', () => {
     const unlisten = vi.fn()
     const listener = vi.fn()
     const bridge: DesktopProofBridge = {
-      openDirectory: vi.fn().mockResolvedValue('/tmp/stackedit-proof'),
+      openDirectory: vi.fn().mockResolvedValue('/tmp/stackmark-proof'),
       invoke: vi.fn(async (command: string) => {
         if (command === 'atomic_write_markdown') {
           return {
@@ -38,7 +38,7 @@ describe('desktop proof gateway', () => {
 
     expect(gateway.supported).toBe(true)
     await expect(gateway.watchExternalChanges(listener)).resolves.toBe(unlisten)
-    await expect(gateway.chooseWorkspace()).resolves.toBe('/tmp/stackedit-proof')
+    await expect(gateway.chooseWorkspace()).resolves.toBe('/tmp/stackmark-proof')
     await expect(gateway.saveProof('# Stage 0\n')).resolves.toEqual({
       path: 'stage-zero-proof.md',
       sha256: 'proof-hash',
@@ -53,7 +53,7 @@ describe('desktop proof gateway', () => {
       mtimeUnixMs: 84,
     })
     expect(bridge.invoke).toHaveBeenNthCalledWith(1, 'set_workspace_root', {
-      root: '/tmp/stackedit-proof',
+      root: '/tmp/stackmark-proof',
     })
     expect(bridge.invoke).toHaveBeenNthCalledWith(2, 'start_workspace_watch')
     expect(bridge.invoke).toHaveBeenNthCalledWith(3, 'atomic_write_markdown', {

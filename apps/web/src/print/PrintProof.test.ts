@@ -7,7 +7,7 @@ const pending = vi.hoisted(() => [] as Array<{
   resolve: (result: { mode: 'pagedjs'; pageCount: number; warnings: [] }) => void
 }>)
 
-vi.mock('@stackedit/print', () => ({
+vi.mock('@stackmark/print', () => ({
   DEFAULT_PRINT_SETTINGS: { pageSize: 'A4' },
   findPagesHidingContentWhenSettled: vi.fn(async () => []),
   installNativePageRule: vi.fn(),

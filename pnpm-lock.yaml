@@ -26,10 +26,10 @@ importers:
 
   apps/web:
     dependencies:
-      '@stackedit/markdown':
+      '@stackmark/markdown':
         specifier: workspace:*
         version: link:../../packages/markdown
-      '@stackedit/print':
+      '@stackmark/print':
         specifier: workspace:*
         version: link:../../packages/print
       '@tauri-apps/api':

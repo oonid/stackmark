@@ -118,10 +118,10 @@ describe('print policy', () => {
       pageSize: 'A4',
       orientation: 'portrait',
       margins: { top: '16mm', right: '14mm', bottom: '18mm', left: '14mm' },
-      runningTitle: 'StackEdit print proof',
+      runningTitle: 'StackMark print proof',
       pageCounter: 'Page {{page}} of {{pages}}',
     })
-    expect(printPolicy(DEFAULT_PRINT_SETTINGS).pageClass).toBe('stackedit-print-document')
+    expect(printPolicy(DEFAULT_PRINT_SETTINGS).pageClass).toBe('stackmark-print-document')
   })
 
   it('keeps pages readable with safe image, code, heading, and table policies', () => {

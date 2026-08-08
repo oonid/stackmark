@@ -133,7 +133,7 @@ test('renders screen preview pages at the stylesheet A4 geometry with generated 
   expect(geometry.contentHeightMm).toBeCloseTo(263, 0)
   // Generated margin boxes from the same @page rule. Before the stylesheet was
   // handed to Paged.js these boxes were not generated at all.
-  expect(geometry.runningTitle).toBe('StackEdit print proof')
+  expect(geometry.runningTitle).toBe('StackMark print proof')
   // Computed style keeps counter() unresolved, so assert the rule reached the
   // margin box rather than trying to read the rendered number.
   expect(geometry.pageCounter).toMatch(/counter\(page\)/)
@@ -156,7 +156,7 @@ test('carries every sentence of the source into the paged preview', async ({ pag
   const required = [
     'This source document seeds the shared Stage 0 editor shell with inline math',
     'The print proof deliberately repeats ordinary editorial prose so the browser must create multiple A4 pages.',
-    'This sentence is representative of the Markdown content a StackEdit author can review before opening the print dialog.',
+    'This sentence is representative of the Markdown content a StackMark author can review before opening the print dialog.',
     'Documentation is rarely a single screen.',
     'When a page is nearly full, a heading should travel with the content that follows it.',
     'The same policy applies to long-form notes.',

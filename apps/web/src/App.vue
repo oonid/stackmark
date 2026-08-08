@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from 'vue'
-import { renderMarkdown } from '@stackedit/markdown'
+import { renderMarkdown } from '@stackmark/markdown'
 import MarkdownPreview from './MarkdownPreview.vue'
 import PrintProof from './print/PrintProof.vue'
 import { createDesktopProofGateway, type WorkspaceExternalChange, type WorkspaceFileMetadata } from './platform/desktop-proof'
@@ -75,7 +75,7 @@ const forcePrintFallback = new URLSearchParams(window.location.search).has('prin
   <main class="proof-shell">
     <header class="proof-header">
       <p class="eyebrow">Shared Vue proof screen</p>
-      <h1 data-testid="stage-zero-title">StackEdit Stage 0</h1>
+      <h1 data-testid="stage-zero-title">StackMark Stage 0</h1>
       <p>One frontend shell for the browser today and the Tauri host in the next proof.</p>
     </header>
 

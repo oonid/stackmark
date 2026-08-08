@@ -1,3 +1,21 @@
+# StackMark
+
+**StackMark is a fork of [StackEdit](https://github.com/benweet/stackedit)**, the Markdown editor
+created by Benoit Schweblin, and is distributed under the same Apache License 2.0.
+
+StackMark is not affiliated with, endorsed by, or supported by the StackEdit project. The name is
+used here only to describe the origin of this work, as Section 6 of the licence permits.
+
+## Relationship to upstream
+
+- `LICENSE` is upstream's, unchanged.
+- `src/`, `static/`, `server/`, `chart/`, `chrome-app/`, `config/` and `build/` are upstream
+  StackEdit v4 and are kept as reference material.
+- `apps/` and `packages/` are new work written for this fork.
+- Everything below this section is upstream's original README, retained for attribution.
+
+---
+
 # StackEdit
 
 [![Build Status](https://img.shields.io/travis/benweet/stackedit.svg?style=flat)](https://travis-ci.org/benweet/stackedit) [![NPM version](https://img.shields.io/npm/v/stackedit.svg?style=flat)](https://www.npmjs.org/package/stackedit)

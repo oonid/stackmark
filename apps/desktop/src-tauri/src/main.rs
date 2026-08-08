@@ -1,3 +1,3 @@
 fn main() {
-    stackedit_desktop::run();
+    stackmark_desktop::run();
 }

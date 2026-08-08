@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { RenderedMarkdown } from '@stackedit/markdown'
+import type { RenderedMarkdown } from '@stackmark/markdown'
 import { createApp, nextTick, onBeforeUnmount, onMounted, useTemplateRef, watch, type App } from 'vue'
 import MermaidBlock from './mermaid/MermaidBlock.vue'
 

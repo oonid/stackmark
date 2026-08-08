@@ -1,9 +1,9 @@
-import { sanitizeMermaidSvg } from '@stackedit/markdown/mermaid/svg-sanitizer'
+import { sanitizeMermaidSvg } from '@stackmark/markdown/mermaid/svg-sanitizer'
 import {
   MERMAID_PROTOCOL_VERSION,
   isMermaidRenderResponse,
   type MermaidRenderRequest,
-} from '@stackedit/markdown/mermaid/protocol'
+} from '@stackmark/markdown/mermaid/protocol'
 
 export class MermaidSandbox {
   private readonly frame: HTMLIFrameElement
@@ -29,7 +29,7 @@ export class MermaidSandbox {
   async render(source: string, theme: MermaidRenderRequest['theme'] = 'default'): Promise<string> {
     await this.ready
     const id = crypto.randomUUID()
-    const request: MermaidRenderRequest = { type: 'stackedit:mermaid:render', version: MERMAID_PROTOCOL_VERSION, id, source, theme }
+    const request: MermaidRenderRequest = { type: 'stackmark:mermaid:render', version: MERMAID_PROTOCOL_VERSION, id, source, theme }
     return new Promise((resolve, reject) => {
       const timer = window.setTimeout(() => {
         this.pending.delete(id)

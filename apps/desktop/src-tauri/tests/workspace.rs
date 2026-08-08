@@ -1,6 +1,6 @@
 use std::{fs, sync::mpsc, time::Duration};
 
-use stackedit_desktop::workspace::{WorkspaceEventKind, WorkspaceService};
+use stackmark_desktop::workspace::{WorkspaceEventKind, WorkspaceService};
 use tempfile::tempdir;
 
 fn workspace() -> (tempfile::TempDir, WorkspaceService) {

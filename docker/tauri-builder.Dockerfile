@@ -15,8 +15,8 @@ ARG HOST_UID=1000
 ARG HOST_GID=1000
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV STACKEDIT_IN_BUILDER=1
-ENV COREPACK_HOME=/opt/stackedit-corepack
+ENV STACKMARK_IN_BUILDER=1
+ENV COREPACK_HOME=/opt/stackmark-corepack
 ENV CARGO_HOME=/cargo
 ENV RUSTUP_HOME=/rustup
 ENV PATH=/cargo/bin:/usr/local/node/bin:$PATH
@@ -56,10 +56,10 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
   && cargo install tauri-cli@2.11.4 --locked \
   && cargo tauri --version
 
-RUN groupadd --gid "$HOST_GID" --non-unique stackedit \
-  && useradd --uid "$HOST_UID" --gid "$HOST_GID" --non-unique --create-home stackedit \
+RUN groupadd --gid "$HOST_GID" --non-unique stackmark \
+  && useradd --uid "$HOST_UID" --gid "$HOST_GID" --non-unique --create-home stackmark \
   && mkdir -p /workspace /cargo/registry /cargo/git \
-  && chown -R stackedit:stackedit /workspace /cargo
+  && chown -R stackmark:stackmark /workspace /cargo
 
-USER stackedit
+USER stackmark
 WORKDIR /workspace/apps/desktop

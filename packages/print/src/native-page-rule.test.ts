@@ -7,7 +7,7 @@ const printCss = `
   margin: 16mm 14mm 18mm;
 
   @top-center {
-    content: "StackEdit print proof";
+    content: "StackMark print proof";
     font-size: 9pt;
   }
 
@@ -41,7 +41,7 @@ describe('extractPageRule', () => {
     expect(rule).not.toContain('@top-center')
     expect(rule).not.toContain('@bottom-center')
     expect(rule).not.toContain('counter(page)')
-    expect(rule).not.toContain('StackEdit print proof')
+    expect(rule).not.toContain('StackMark print proof')
   })
 
   it('returns null when the stylesheet declares no page rule', () => {

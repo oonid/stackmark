@@ -15,8 +15,8 @@ vi.mock('./mermaid/MermaidSandbox', () => ({
 // Paged.js is a browser-layout polyfill; running it under jsdom exercises no
 // real pagination and injects stylesheets jsdom cannot compute styles against.
 // Pagination is proven in the Chromium and WebKitGTK gates instead.
-vi.mock('@stackedit/print', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@stackedit/print')>()),
+vi.mock('@stackmark/print', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@stackmark/print')>()),
   installNativePageRule: vi.fn(),
   paginate: vi.fn(async () => ({
     mode: 'plain-css' as const,
@@ -29,7 +29,7 @@ describe('Stage 0 proof screen', () => {
   it('presents the required web and desktop proof gates', () => {
     const wrapper = mount(App)
 
-    expect(wrapper.get('[data-testid="stage-zero-title"]').text()).toBe('StackEdit Stage 0')
+    expect(wrapper.get('[data-testid="stage-zero-title"]').text()).toBe('StackMark Stage 0')
     expect(wrapper.find('[data-testid="markdown-source"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="rendered-preview"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="desktop-file-proof"]').exists()).toBe(true)
@@ -51,7 +51,7 @@ describe('Stage 0 proof screen', () => {
     const wrapper = mount(App)
 
     expect(wrapper.get('[data-testid="rendered-preview"]').html()).toContain(
-      '<h1>StackEdit print proof</h1>',
+      '<h1>StackMark print proof</h1>',
     )
   })
 

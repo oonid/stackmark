@@ -93,5 +93,5 @@ pub fn run() {
             start_workspace_watch
         ])
         .run(tauri::generate_context!())
-        .expect("error while running StackEdit desktop proof");
+        .expect("error while running StackMark desktop proof");
 }

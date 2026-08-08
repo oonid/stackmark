@@ -1,7 +1,7 @@
 export const MERMAID_PROTOCOL_VERSION = 1 as const
 
 export interface MermaidRenderRequest {
-  type: 'stackedit:mermaid:render'
+  type: 'stackmark:mermaid:render'
   version: typeof MERMAID_PROTOCOL_VERSION
   id: string
   source: string
@@ -9,7 +9,7 @@ export interface MermaidRenderRequest {
 }
 
 export interface MermaidRenderResponse {
-  type: 'stackedit:mermaid:result'
+  type: 'stackmark:mermaid:result'
   version: typeof MERMAID_PROTOCOL_VERSION
   id: string
   svg?: string
@@ -19,7 +19,7 @@ export interface MermaidRenderResponse {
 export function isMermaidRenderRequest(value: unknown): value is MermaidRenderRequest {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<MermaidRenderRequest>
-  return candidate.type === 'stackedit:mermaid:render'
+  return candidate.type === 'stackmark:mermaid:render'
     && candidate.version === MERMAID_PROTOCOL_VERSION
     && typeof candidate.id === 'string'
     && typeof candidate.source === 'string'
@@ -29,7 +29,7 @@ export function isMermaidRenderRequest(value: unknown): value is MermaidRenderRe
 export function isMermaidRenderResponse(value: unknown): value is MermaidRenderResponse {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<MermaidRenderResponse>
-  return candidate.type === 'stackedit:mermaid:result'
+  return candidate.type === 'stackmark:mermaid:result'
     && candidate.version === MERMAID_PROTOCOL_VERSION
     && typeof candidate.id === 'string'
     && (typeof candidate.svg === 'string' || typeof candidate.error === 'string')

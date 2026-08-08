@@ -1,7 +1,7 @@
 import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
 
-const rendererNonce = 'stackedit-mermaid-renderer-v1'
+const rendererNonce = 'stackmark-mermaid-renderer-v1'
 
 export default defineConfig({
   publicDir: false,
@@ -14,7 +14,7 @@ export default defineConfig({
         source: `<!doctype html>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${rendererNonce}'; img-src data:; style-src 'unsafe-inline'; font-src data:; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'">
-<title>StackEdit Mermaid renderer</title>
+<title>StackMark Mermaid renderer</title>
 <script nonce="${rendererNonce}" src="/generated/mermaid-renderer.iife.js" referrerpolicy="no-referrer"></script>
 `,
       })
@@ -25,7 +25,7 @@ export default defineConfig({
     lib: {
       entry: resolve(import.meta.dirname, 'src/mermaid/renderer-entry.ts'),
       formats: ['iife'],
-      name: 'StackEditMermaidRenderer',
+      name: 'StackMarkMermaidRenderer',
       fileName: () => 'mermaid-renderer.iife.js',
     },
     outDir: resolve(import.meta.dirname, 'public/generated'),

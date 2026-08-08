@@ -1,5 +1,5 @@
 {
-  "name": "@stackedit/web",
+  "name": "@stackmark/web",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,8 +12,8 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@stackedit/markdown": "workspace:*",
-    "@stackedit/print": "workspace:*",
+    "@stackmark/markdown": "workspace:*",
+    "@stackmark/print": "workspace:*",
     "@tauri-apps/api": "2.11.1",
     "@tauri-apps/plugin-dialog": "2.7.2",
     "katex": "0.18.1",

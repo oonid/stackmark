@@ -1,0 +1,9 @@
+[Desktop Entry]
+Categories={{categories}}
+Comment={{comment}}
+Exec={{exec}}{{exec_arg}}
+Icon={{icon}}
+Name=StackMark
+Terminal=false
+Type=Application
+StartupWMClass={{exec}}

@@ -8,8 +8,8 @@ services:
         HOST_GID: "${HOST_GID:-1000}"
     working_dir: /workspace
     environment:
-      HOME: /tmp/stackedit-home
-      PNPM_HOME: /tmp/stackedit-pnpm
+      HOME: /tmp/stackmark-home
+      PNPM_HOME: /tmp/stackmark-pnpm
     volumes:
       - .:/workspace
       - pnpm-store:/pnpm/store
@@ -17,7 +17,7 @@ services:
   frontend:
     extends:
       service: js
-    command: pnpm --filter @stackedit/web dev --host 0.0.0.0
+    command: pnpm --filter @stackmark/web dev --host 0.0.0.0
     ports:
       - "127.0.0.1:1420:1420"
   browser:
@@ -29,8 +29,8 @@ services:
         HOST_GID: "${HOST_GID:-1000}"
     working_dir: /workspace
     environment:
-      HOME: /tmp/stackedit-browser-home
-      PNPM_HOME: /tmp/stackedit-browser-pnpm
+      HOME: /tmp/stackmark-browser-home
+      PNPM_HOME: /tmp/stackmark-browser-pnpm
     volumes:
       - .:/workspace
       - pnpm-store:/pnpm/store
@@ -44,8 +44,8 @@ services:
         HOST_GID: "${HOST_GID:-1000}"
     working_dir: /workspace/apps/desktop
     environment:
-      HOME: /tmp/stackedit-builder-home
-      PNPM_HOME: /tmp/stackedit-builder-pnpm
+      HOME: /tmp/stackmark-builder-home
+      PNPM_HOME: /tmp/stackmark-builder-pnpm
       CARGO_HOME: /cargo
     volumes:
       - .:/workspace
