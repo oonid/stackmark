@@ -6,6 +6,9 @@ created by Benoit Schweblin, and is distributed under the same Apache License 2.
 StackMark is not affiliated with, endorsed by, or supported by the StackEdit project. The name is
 used here only to describe the origin of this work, as Section 6 of the licence permits.
 
+- Upstream: <https://github.com/benweet/stackedit>
+- This fork: <https://github.com/oonid/stackmark>
+
 ## Relationship to upstream
 
 - `LICENSE` is upstream's, unchanged.

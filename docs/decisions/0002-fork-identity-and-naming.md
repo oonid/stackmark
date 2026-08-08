@@ -21,7 +21,7 @@ The product is **StackMark**, described as a fork of StackEdit.
 
 The display name is restored where a user actually sees it: a `desktopTemplate` sets `Name=StackMark` for the application menu, and the window title is set independently. `mainBinaryName` gives `/usr/bin/stackmark` rather than a suffixed binary.
 
-The reverse-DNS identifier is `org.stackmark.desktop`. It should change if the project adopts a domain it controls.
+The reverse-DNS identifier is `id.or.oo.stackmark`, from the `oo.or.id` domain the author controls. The trailing component names the application; a `.desktop` suffix was considered and rejected, since that is the launcher file's extension rather than part of the identifier.
 
 Resulting artifact:
 
