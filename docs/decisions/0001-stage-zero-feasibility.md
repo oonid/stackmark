@@ -95,7 +95,9 @@ The host has 2.10.1 against the plan's 2.11.4. Dev mode is unaffected. The relea
 
   The first packaged run also failed the Mermaid gate outright, for the reason recorded in decision 3. That is fixed and confirmed by running the release binary, which serves the embedded frontend under the production policy without any installation.
 
-  Still to run: the folder, save and external-change checks against the installed build, and a printed PDF from it.
+  Run against the installed package on 2026-09-02. The application's own folder picker opens and the write lands in the chosen root, with the window's narrowed capability set and no dialog permission. The saved file's SHA-256 and modification time match the values the interface reports, to the millisecond, with no temporary file left behind and mode 0600. An external edit is reported with a workspace-relative path and a hash matching what the other editor actually wrote, and the process accrued no CPU consistent with the watcher waking itself. The print dialog produced a seven-page A4 PDF, 595 x 842 pt, containing no raster image, with every Mermaid diagram drawn with its connectors and every KaTeX expression rendered.
+
+  Two limits of that run should be named rather than left implied. The external editor wrote in place, so the file's inode never changed and the watcher's rename path -- the path the atomic save itself uses, and the one carried finding 7 concerns -- is still unexercised. And A4 had to be chosen in the print dialog, exactly as D1 predicts.
 - **Offline behaviour of the installed package.** Offline behaviour of the development build passes: editing, KaTeX, Mermaid and pagination work with external networking disabled, and the exported PDF is structurally identical to the online one. The production bundle makes no remote request.
 
 ## Decision

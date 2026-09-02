@@ -52,12 +52,12 @@ this shape.
 
 ## Open decisions
 
-- **Branch integration.** All 43 commits are on `feat/stage-zero`; `master` is at `93c4b659`
-  with none of them. Stage 1 says "create the monorepo", which Stage 0 already did, so the
-  branch has to become the trunk — or Stage 1 has nothing to build on.
 - **Remote images.** `<img src="https://…">` survives sanitizing. The desktop policy blocks the
   fetch; the browser policy permits `https:` deliberately, so the question is still open. Most
   Markdown editors allow it; an untrusted document turns it into a tracking beacon.
+
+Branch integration is settled. The Stage 0 commits are the trunk: `master` carries all of them,
+`v0.1.0-stage0` tags the slice, and both are published. Stage 1 builds on `master`.
 
 ## Carried findings
 
@@ -79,3 +79,7 @@ Recorded in the evidence file and unfixed, in rough order of consequence:
 7. Replacing a watched file with a symlink is silently ignored, with no signal to the interface
    and no test.
 8. The `.deb` build is not reproducible, which Stage 4 requires.
+9. **An external change is reported but never reconciled.** The interface shows the new hash while
+   the editor keeps its own copy, so the next save silently discards the other writer's work.
+   Stage 0 scoped detection only; reload and conflict handling belong to Stage 1. Demonstrated
+   against the installed package, not inferred.
