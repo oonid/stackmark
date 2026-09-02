@@ -5,6 +5,8 @@
 **Target:** Web and Linux desktop, with KDE Neon/Ubuntu LTS as the initial desktop reference  
 **Approach:** Clean shared TypeScript core with selective porting from StackEdit v5 and a thin Rust/Tauri shell
 
+> **Amended by section 22.** Stage 0 has since run on the reference host and disproved several assumptions in sections 10, 12 and 17. The original wording is kept so the design reads as it was approved; section 22 records what the evidence changed. The product is now named StackMark — see ADR 0002.
+
 ## 1. Context
 
 StackEdit v5.15.4 is a browser-first Vue 2 application whose last release was in May 2023. Its runtime includes a custom editor, IndexedDB and `localStorage` persistence, browser-based OAuth, provider synchronization, a Node server, and server-side Pandoc and wkhtmltopdf export. Its frontend toolchain is based on Vue 2.5, Vuex 3, Webpack 2, Babel 6, Jest 23, and Node Sass 4.
@@ -459,3 +461,35 @@ Roles are filled as specified above. If a role cannot be filled, work pauses and
 - [CSS paged media](https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Paged_media)
 - [Mermaid security configuration](https://mermaid.js.org/config/schema-docs/config-properties-securitylevel.html)
 - [Mermaid security advisories](https://github.com/mermaid-js/mermaid/security)
+
+## 22. Stage 0 addendum (2026-09-02)
+
+Stage 0 was the technical proof this design asked for, and it ran to completion on KDE neon with WebKitGTK 2.52.3. It disproved several assumptions written here before any of it had been attempted. Nothing below is speculation: every item was measured on the reference host or in the packaged application. The full record is in `docs/engineering/evidence/stage-0.md`; the decisions are in ADR 0001.
+
+### Amendments to section 12, Print Studio and PDF
+
+**Paged.js does not supply margin content, running headers or page counters to printed output.** It generates them for its own on-screen preview. No browser implements CSS margin boxes, so nothing declared in `@page` reaches the printer or the PDF. A page number, document title, running header or footer must be composed into the document body, or it must not be promised. This affects the bullet listing page numbers, running headers and footer text, and the pipeline diagram's claim that Paged.js layout feeds `window.print()` — it does not; the printed document is the plain-CSS source.
+
+**The in-application page preview does not work on the reference host.** Chromium paginates the fixture correctly at A4. WebKitGTK leaves the remainder of a split paragraph outside the visible column, so the preview reliably degrades to a continuous document. The desktop application has no page-accurate on-screen preview, and phase one should not offer one on Linux until an engine passes this gate.
+
+**Paged.js 0.4.3 requires a vendored patch to paginate at all**, because `createBreakToken` dereferences an unresolved break anchor. The patch turns a crash into an early return, which the engine reads as "page finished" — so the failure it produces is silent truncation. Whatever integrates Paged.js must keep a content-integrity check between that behaviour and the reader.
+
+**Paper size and margins are user-controlled on Linux, not document-controlled.** WebKitGTK ignores `@page { size }` and `@page { margin }`; the GTK dialog governs both. A4 output is correct when the user selects A4, and the default was US Letter. The controls for paper, orientation and adjustable margins therefore describe what the print dialog offers on the desktop, not what the application can set.
+
+### Amendments to section 17, Delivery Stages
+
+**Stage 3** cannot assume Paged.js integration succeeds. Its pagination is usable on the web surface and not on the reference desktop, so Print Studio's page preview is a per-engine progressive enhancement with a mandatory continuous fallback — which this design already required, and which is now the primary path on Linux rather than the exceptional one.
+
+**Stage 4** asks for reproducible `.deb` generation. Successive builds of identical source currently produce different artifacts, so a checksum identifies one build rather than a commit. Reproducibility is unmet work, not a property to be confirmed.
+
+### Constraints this design does not mention
+
+**A content policy delivered as a response header applies to sandboxed sub-documents, where `'self'` matches nothing.** A frame sandboxed without `allow-same-origin` has an opaque origin, so a policy that permits only `'self'` refuses that frame's own scripts. The packaged application shipped in exactly this state and rendered no diagrams. Any policy served by header must name the scheme and host explicitly. A `<meta>` policy binds only its own document and does not have this effect. This governs every future feature that isolates content in a sandboxed frame.
+
+**The native side must own directory selection.** If the web layer picks the folder and passes the path down, filesystem confinement is only ever relative to a root the untrusted side named. Section 14's security model should be read with this in mind: kernel-level confinement is necessary and not sufficient.
+
+**Evidence from development mode does not transfer to the packaged application.** Development serves the frontend over HTTP from a local server; the product serves it over a custom scheme, and the two differ in ways that decide whether the application works at all. Two defects reached builds that had already been recorded as passing gates. Every gate should be exercised against a packaged build, which is cheap: the release binary runs directly without installing anything.
+
+### Carried into Stage 1
+
+Findings from the independent review that are recorded but unfixed: pagination timeouts reject without cancelling the underlying operation; a FIFO named `*.md` inside a workspace blocks the reading thread and then the watcher; mutex poisoning would make later workspace operations fatal; the non-Linux filesystem path is check-then-use and weaker than the Linux one. Most significantly, **no test crosses the JavaScript to Rust boundary** — renaming a command on either side leaves every test passing while the application is broken. Stage 1's own "with contract tests" clause is the right place to close that.
