@@ -1,7 +1,7 @@
 # Stage 0 to Stage 1 handover
 
 **Recorded:** 2026-09-02  
-**Branch:** `feat/stage-zero`, 43 commits, not merged  
+**Delivered as:** `master`, tagged `v0.1.0-stage0`  
 **Decision:** ADR 0001 — go, with four named deviations
 
 Stage 0 was a vertical feasibility slice, not a first draft of the product. Some of it is
