@@ -272,9 +272,33 @@ Artifact `stackmark_0.1.0-stage0_amd64.deb`, SHA-256 `52d12b2b02285eab20dc913bc5
 | Docker-only JavaScript | Wrapper contract; Node and pnpm versions reported from inside the container | No host Node or pnpm participates; `tauri.conf.json` declares no `beforeDevCommand` | **PASS** |
 | Shared web and Tauri UI | Production build; 17 browser tests | The same screen renders in Chromium and in WebKitGTK, in development and from the installed package | **PASS** |
 | Desktop files | 14 Rust tests covering path confinement, atomic replacement, symlink-swap rejection, own-write suppression, watcher restart | Folder dialog, atomic save, and an external edit whose reported hash matched the file on disk exactly — verified in development and again from the installed package | **PASS** |
-| KaTeX and Mermaid | Unit, adversarial and browser tests, including all five diagram types rendered through the real sandbox | Renders in WebKitGTK in development and, after the content-policy fix, from the installed package | **PASS**, with one qualification: the four non-flowchart diagram types are proven in Chromium only; WebKitGTK has rendered a flowchart |
+| KaTeX and Mermaid | Unit, adversarial and browser tests, including all five diagram types rendered through the real sandbox and asserted to have painted connectors on screen and in print | All five diagram types render in the installed package on WebKitGTK, with their connecting lines, after the content-policy and connector fixes | **PASS** |
 | Pagination and printing | Browser assertions; native PDF asserted at A4 from the document's own `@page` | The installed application exported two A4 pages, complete text, a vector diagram, the light-paper palette and embedded KaTeX subsets, with no content outside the page box | **PASS with deviations D1, D2, D3** |
 | Debian package | Builder image with every tool pinned and verified during build; `inspect-deb.sh`, its own failure modes exercised including a package tampered with a planted Node binary | Installs with no additional packages pulled, launches from a terminal and from the application menu, removes leaving no binary, desktop entry, icon or `rc` state | **PASS** |
-| No-network product path | The production bundle makes no remote `fetch`, XHR, WebSocket or `importScripts` call; all 59 fonts are bundled; no directive in the production policy names an external origin | Development build passes offline. **The installed build has not been run offline** | **OUTSTANDING** |
+| No-network product path | The production bundle makes no remote `fetch`, XHR, WebSocket or `importScripts` call; all 59 fonts are bundled; no directive in the production policy names an external origin | With networking disconnected, the installed application launched, rendered all five diagram types and KaTeX, and exported a PDF textually identical to the online one | **PASS** |
 
-The single outstanding gate is the offline path against the installed build. It is close to structurally guaranteed — the policy permits no external origin and the bundle makes no remote call — but that is the same shape of reasoning that recorded the Mermaid gate as passing before it was true, so it is recorded as outstanding rather than inferred.
+Every gate now has host evidence.
+
+### Diagram types on the reference host (2026-09-02)
+
+Rendering the four non-flowchart diagram types in the packaged application — the first time any of them had been drawn on WebKitGTK — exposed a defect that every automated gate had passed over. Class and state diagrams drew their boxes and labels with no connecting lines, on screen and in the exported PDF.
+
+The SVG sanitizer strips Mermaid's stylesheet and every style attribute, so the application re-supplies connector colours by class name. That list named five classes, derived from the flowchart, and covered flowcharts, sequence diagrams and entity relationships. Class diagrams draw connectors as `.relation` and state diagrams as `.transition`, so neither received a stroke.
+
+The diagram-type tests added earlier did not catch it because they asserted that arrowhead markers existed rather than that the line joining them was painted. A marker with no line is still a marker. The assertions now measure the computed stroke of every connector on screen and in print, and were verified by restoring the five-class list and watching class and state fail.
+
+### Offline path against the installed build — PASS
+
+With networking disconnected, the installed application launched, rendered all five diagram types and inline KaTeX, and exported a PDF through the GTK dialog. Both exports were measured:
+
+| | Online | Offline |
+|---|---|---|
+| Pages, geometry | 2, 595 × 842 pt (A4) | 2, 595 × 842 pt (A4) |
+| Diagram labels | all present | all present |
+| Stroke operations | 1057 | 1057 |
+| Vector path operations | 998 | 998 |
+| Connector stroke `#475569` | present | present |
+| Node fill `#f8fafc` | present | present |
+| Embedded KaTeX subsets | 2 | 2 |
+
+The extracted text of the two files is identical. Disconnecting the network changed nothing about what the product produced.

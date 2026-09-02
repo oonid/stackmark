@@ -1,6 +1,6 @@
 # 0001 — StackMark Stage 0 feasibility
 
-- **Status:** Accepted. **Conditional go**, with one gate outstanding and four deviations named.
+- **Status:** Accepted. **Go**, with four deviations named.
 - **Date:** 2026-08-08, revised 2026-09-02
 - **Note:** written before the fork was named. The product is StackMark; see ADR 0002.
 - **Scope:** The Stage 0 vertical feasibility slice on `feat/stage-zero`. Not the phase-one product.
@@ -88,13 +88,13 @@ The host has 2.10.1 against the plan's 2.11.4. Dev mode is unaffected. The relea
 
 ## Decision
 
-**Conditional go.** Every mandatory Stage 0 gate is demonstrated on the reference host except one, and that one is a confirmation rather than an open question.
+**Go.** Every mandatory Stage 0 gate is demonstrated on the reference host with host evidence, not inference.
 
-Docker-only tooling, the shared frontend, Mermaid isolation, workspace path safety confined by the kernel, atomic saves, external-change detection, system printing, and Debian packaging are all proven with automated and host evidence. The package installs on KDE neon with its declared dependencies satisfied, launches from a terminal and from the application menu, renders and prints correctly, and removes cleanly.
+Docker-only tooling, the shared frontend, Mermaid isolation, workspace path safety confined by the kernel, atomic saves, external-change detection, system printing and Debian packaging are all proven. The package installs on KDE neon with its declared dependencies satisfied, launches from a terminal and from the application menu, renders every Mermaid diagram type with its connecting lines, prints two A4 pages with complete text and a vector diagram, and removes cleanly. With networking disconnected it produces a PDF textually identical to the online one.
 
-**The condition:** the no-network path has not been exercised against the installed build. The production policy names no external origin and the bundle makes no remote call, so the gate is close to structurally guaranteed — but the Mermaid gate was also "obviously fine" until it was packaged, so it stays outstanding until observed. Should that check fail, this becomes a conditional go with a named fallback rather than a plain one; it cannot become a no-go, because nothing in the product depends on the network.
+Stage 1 planning is authorised, subject to the conditions below.
 
-Stage 1 planning is authorised on this basis, subject to the conditions below.
+Two defects reached a build that had already been called a passing gate, and both were found by a person looking at the running application rather than by the suite: the packaged build rendered no diagrams at all, and class and state diagrams rendered without their connecting lines. Neither was reproducible in Chromium. The suite is a filter, not the gate.
 
 Conditions attached to the architectural go:
 
