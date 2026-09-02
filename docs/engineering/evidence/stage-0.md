@@ -188,6 +188,8 @@ The release builder is Ubuntu 24.04, matching the KDE neon base, with Node 24.18
 
 `./dev desktop-build` produces `stackmark_0.1.0-stage0_amd64.deb`, package `stackmark`, depending on `libwebkit2gtk-4.1-0` and `libgtk-3-0`, installing `/usr/bin/stackmark` and a `StackMark` menu entry. `scripts/inspect-deb.sh` passes and records a SHA-256 beside the artifact. Its own failure modes were exercised: no argument, two packages, a missing file, a file that is not a package, and a package tampered with a planted `node` binary, which it rejects.
 
+**That claim was too generous when written, and is corrected below.** Every case exercised was a negative one. The script asked only whether something existed at each path, so it passed a package containing no application at all — see the independent review section.
+
 The build corrected two things it would otherwise have shipped. The bundle category must come from Tauri's fixed set rather than free text. The hand-written dependency list duplicated what Tauri derives from the linked libraries and added `libayatana-appindicator3-1`, which `objdump` shows the binary does not link, so it would have forced an unnecessary install on every user; the derived list is used instead.
 
 Successive builds of unchanged application code produce different checksums, so **the build is not reproducible**. A checksum identifies one artifact, not the code at a commit.
@@ -302,3 +304,28 @@ With networking disconnected, the installed application launched, rendered all f
 | Embedded KaTeX subsets | 2 | 2 |
 
 The extracted text of the two files is identical. Disconnecting the network changed nothing about what the product produced.
+
+## Independent re-review (2026-09-02)
+
+Three reviewers examined `master..feat/stage-zero` without access to the reasoning behind it, briefed to distrust this document. Their findings were reproduced before anything was changed.
+
+### Defects behind gates recorded as passing
+
+- **The package inspection passed a decoy containing no application.** A zero-byte, non-executable file under the wrong name, a desktop entry pointing at a path absent from the package, and no embedded frontend — `PASS`, exit 0. Reproduced here. This is the same class as the defect that reached a release: a package that installs and launches but cannot render. The script now unpacks the artifact and checks the binary is an executable ELF of plausible size, that the desktop entry launches a binary the package installs, and that the embedded frontend's asset paths are present. Two decoys are rejected.
+- **Inline maths claimed ordinary prose.** `Prices: $5-$10 per unit` and `Set $HOME/$USER now` rendered as equations, and `[Buy for $5](/shop)$10` destroyed the link. Both delimiters must now sit on a word boundary.
+- **The Markdown sanitizer permitted exfiltration and interface redress.** A CSS `url()` in a `style` attribute and a remote `img` `src` passed through untouched; the browser build shipped no policy at all. The attribute cannot simply be dropped — KaTeX positions every glyph with inline geometry, twenty style attributes for one expression — so values are filtered instead, and the browser build now carries its own policy.
+- **The watcher starved indefinitely.** Any file changing faster than the seventy-five millisecond debounce inside the workspace suppressed every external-change report for as long as it continued; an editor swap file or a sync client is enough. Batches are now bounded.
+- **The renderer frame's readiness had no timeout**, so a frame that never loads — what a refused renderer script produces — hung every diagram forever with nothing surfaced.
+- **The content-loss guard was blind to repetitive documents.** Chunks were searched for anywhere in the output, so a dropped table row was found again in the row above it: nine hundred and forty characters removed from a four-hundred-row table were reported as nothing missing. Chunks are now matched in order. This guard matters because the Paged.js patch converts a crash into silent truncation.
+- **The workspace root was chosen by the web layer.** The confinement below it was airtight relative to a root the untrusted side named. The application now opens the picker itself, and the window's capability set is strictly smaller: it no longer needs the dialog plugin. Host-verified on 2026-09-02 — the native picker opens from the installed build, and a save reported SHA-256 `f00d2a6c…` and modification time `1788338942789`, both matching the file on disk exactly, with no external-change event.
+- **A regression test disarmed itself.** The connector check returned an empty list both when every connector was painted and when its filter matched nothing, so a Mermaid class rename would have silenced the stylesheet and the test together.
+
+Every fix was confirmed by breaking it again: the decoy packages are rejected, the starvation test times out without the bound, the connector test fails when its filter matches nothing, and the browser policy fails all twenty-one browser tests when tightened to `script-src 'none'`.
+
+### Confirmed sound
+
+The reviewers verified, independently of this document, that the sandboxed frame cannot reach the Tauri IPC through three separate layers; that the SVG sanitizer withstands roughly thirty vectors including mutation XSS and CSS-escape variants; that there is no deadlock, lost wakeup or watcher-thread leak; that the maths rules terminate with linear growth; and that the Paged.js patch is applied to the code actually bundled.
+
+### Carried into Stage 1
+
+Paged.js timeouts reject without cancelling the underlying operation, leaving a chunker mutating a discarded tree and injected stylesheets accumulating. A FIFO named `*.md` inside a workspace blocks the reading thread and then the watcher. Mutex poisoning would make every later workspace operation fatal, though no realistic panic source exists inside a critical section. The non-Linux filesystem path is check-then-use and materially weaker than the Linux one, though unreachable on the shipped target. Nothing crosses the JavaScript–Rust boundary in any test: renaming a command on either side leaves every test green.
