@@ -86,3 +86,9 @@ jobs:
         working-directory: apps/desktop/src-tauri
       - run: cargo test
         working-directory: apps/desktop/src-tauri
+      # cargo test regenerates the bindings. If the committed file no longer
+      # matches the Rust definitions, a command drifted without the TypeScript
+      # side being updated, and that is a build failure rather than something
+      # for a user to discover.
+      - name: Fail if the generated bindings are stale
+        run: git diff --exit-code packages/platform/src/tauri/bindings.ts

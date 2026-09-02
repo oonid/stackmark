@@ -1,0 +1,19 @@
+{
+  "name": "@stackmark/platform",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/contracts.ts",
+    "./tauri/bindings": "./src/tauri/bindings.ts"
+  },
+  "scripts": {
+    "unit": "vitest run --environment jsdom"
+  },
+  "devDependencies": {
+    "vitest": "4.1.10"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "2.11.1"
+  }
+}

@@ -1,48 +1,35 @@
+pub mod commands;
 pub mod workspace;
 
+use std::path::Path;
 use std::sync::Mutex;
 
-use tauri::{AppHandle, Emitter, State};
-use tauri_plugin_dialog::DialogExt;
-use workspace::{FileMetadata, WorkspaceService, WorkspaceWatch};
+use tauri::State;
+use workspace::{WorkspaceService, WorkspaceWatch};
+
+/// The event the watcher emits. Named once so the Rust side and the generated
+/// bindings cannot disagree about it.
+pub const EXTERNAL_CHANGE_EVENT: &str = "workspace://external-change";
 
 #[derive(Default)]
-struct DesktopState {
-    workspace: Mutex<Option<WorkspaceService>>,
-    watch: Mutex<Option<WorkspaceWatch>>,
+pub struct DesktopState {
+    pub workspace: Mutex<Option<WorkspaceService>>,
+    pub watch: Mutex<Option<WorkspaceWatch>>,
 }
 
-fn lock_error(name: &str) -> String {
+pub fn lock_error(name: &str) -> String {
     format!("{name} state is unavailable")
 }
 
-/// Opens the folder picker and adopts the chosen directory as the workspace.
+/// Adopts `root` as the workspace, dropping any watch on the previous one.
 ///
-/// The dialog is opened here rather than in the web layer on purpose. When the
-/// frontend picks the folder and then hands the path back, the path is the
-/// untrusted side's to choose, and the confinement below it — however carefully
-/// built — only ever confines access to a root an attacker could have named.
-/// Owning the picker is what makes the root the user's choice, and it lets the
-/// webview drop the dialog capability entirely.
-#[tauri::command]
-async fn choose_workspace(
-    app: AppHandle,
-    state: State<'_, DesktopState>,
+/// Both the folder picker and the startup path argument arrive here, so
+/// confinement is established the same way whichever named the directory.
+pub fn adopt_workspace(
+    state: &State<'_, DesktopState>,
+    root: &Path,
 ) -> Result<Option<String>, String> {
-    let picker = app.clone();
-    let picked =
-        tauri::async_runtime::spawn_blocking(move || picker.dialog().file().blocking_pick_folder())
-            .await
-            .map_err(|error| error.to_string())?;
-
-    let Some(selection) = picked else {
-        return Ok(None);
-    };
-    let root = selection
-        .into_path()
-        .map_err(|error| format!("the chosen folder is not a local path: {error}"))?;
-
-    let workspace = WorkspaceService::new(&root).map_err(|error| error.to_string())?;
+    let workspace = WorkspaceService::new(root).map_err(|error| error.to_string())?;
     state
         .watch
         .lock()
@@ -55,68 +42,25 @@ async fn choose_workspace(
     Ok(Some(root.display().to_string()))
 }
 
-#[tauri::command(rename_all = "camelCase")]
-fn read_markdown(path: String, state: State<'_, DesktopState>) -> Result<String, String> {
-    let workspace = state
-        .workspace
-        .lock()
-        .map_err(|_| lock_error("workspace"))?
-        .clone()
-        .ok_or_else(|| "choose a workspace first".to_owned())?;
-    let bytes = workspace
-        .read_markdown(path)
-        .map_err(|error| error.to_string())?;
-    String::from_utf8(bytes).map_err(|_| "Markdown file is not valid UTF-8".to_owned())
-}
-
-#[tauri::command(rename_all = "camelCase")]
-fn atomic_write_markdown(
-    path: String,
-    contents: String,
-    state: State<'_, DesktopState>,
-) -> Result<FileMetadata, String> {
-    let workspace = state
-        .workspace
-        .lock()
-        .map_err(|_| lock_error("workspace"))?
-        .clone()
-        .ok_or_else(|| "choose a workspace first".to_owned())?;
-    workspace
-        .atomic_write_markdown(path, contents.as_bytes())
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-fn start_workspace_watch(app: AppHandle, state: State<'_, DesktopState>) -> Result<(), String> {
-    let workspace = state
-        .workspace
-        .lock()
-        .map_err(|_| lock_error("workspace"))?
-        .clone()
-        .ok_or_else(|| "choose a workspace first".to_owned())?;
-    let watch = workspace
-        .start_workspace_watch(move |event| {
-            let _ = app.emit_to("main", "workspace://external-change", event);
-        })
-        .map_err(|error| error.to_string())?;
-    *state
-        .watch
-        .lock()
-        .map_err(|_| lock_error("workspace watch"))? = Some(watch);
-    Ok(())
+/// The command set, collected once. The test in `tests/bindings.rs` exports it,
+/// and `run` registers it, so a command cannot be generated without being
+/// reachable or reachable without being generated.
+pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
+    tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
+        commands::choose_workspace,
+        commands::read_markdown,
+        commands::atomic_write_markdown,
+        commands::start_workspace_watch,
+    ])
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let builder = specta_builder();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(DesktopState::default())
-        .invoke_handler(tauri::generate_handler![
-            choose_workspace,
-            read_markdown,
-            atomic_write_markdown,
-            start_workspace_watch
-        ])
+        .invoke_handler(builder.invoke_handler())
         .run(tauri::generate_context!())
-        .expect("error while running StackMark desktop proof");
+        .expect("error while running StackMark desktop");
 }

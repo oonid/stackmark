@@ -39,7 +39,7 @@ pub enum WorkspaceError {
     Notify(#[from] notify::Error),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FileMetadata {
     pub path: String,
@@ -47,13 +47,13 @@ pub struct FileMetadata {
     pub mtime_unix_ms: u64,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, specta::Type)]
 #[serde(rename_all = "lowercase")]
 pub enum WorkspaceEventKind {
     Modified,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceEvent {
     pub kind: WorkspaceEventKind,

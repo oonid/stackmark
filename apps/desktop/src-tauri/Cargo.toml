@@ -19,6 +19,9 @@ tempfile = "=3.20.0"
 thiserror = "=2.0.16"
 tauri = { version = "=2.11.5", features = [] }
 tauri-plugin-dialog = "=2.7.2"
+specta = { version = "=2.0.0-rc.22", features = ["derive"] }
+specta-typescript = "=0.0.9"
+tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 rustix = { version = "=1.1.4", features = ["fs"] }
