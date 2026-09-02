@@ -45,6 +45,13 @@ function createMarkdownRenderer(): MarkdownIt {
 
     if (end === start || /\s/.test(state.src[end - 1])) return false
 
+    // A dollar sign glued to a word or digit is money, a shell variable or a
+    // stray delimiter far more often than it is maths. Requiring both ends to
+    // sit on a word boundary keeps "$5-$10" and "$HOME/$USER" as prose, and
+    // keeps a link's text from being swallowed by a later dollar sign.
+    if (isWordCharacter(state.src[start - 2])) return false
+    if (isWordCharacter(state.src[end + 1])) return false
+
     if (!silent) {
       const token = state.push('math_inline', 'math', 0)
       token.content = state.src.slice(start, end)
@@ -107,6 +114,11 @@ function createMarkdownRenderer(): MarkdownIt {
   }
 
   return renderer
+}
+
+/** True for a letter or digit, the characters a delimiter must not be glued to. */
+function isWordCharacter(character: string | undefined): boolean {
+  return character !== undefined && /[\p{L}\p{N}]/u.test(character)
 }
 
 function renderMath(source: string, displayMode: boolean): string {

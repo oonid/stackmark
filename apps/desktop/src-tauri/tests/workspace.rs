@@ -304,3 +304,40 @@ fn watcher_does_not_retrigger_itself_by_reading_the_file_it_watches() {
         "the watcher must not report a file that nothing has changed"
     );
 }
+
+#[test]
+fn watcher_reports_an_external_change_while_other_files_keep_changing() {
+    // The debounce window restarts on every message, so without an upper bound
+    // a workspace that is never quiet never delivers anything. An editor swap
+    // file, a sync client or a build watcher inside the folder is enough to
+    // silence external-change reporting entirely, for as long as it runs.
+    let (_directory, service) = workspace();
+    let (sender, receiver) = mpsc::channel();
+    let _watch = service
+        .start_workspace_watch(move |event| {
+            let _ = sender.send(event);
+        })
+        .expect("workspace watcher");
+
+    let noisy = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
+    let stop = noisy.clone();
+    let noise_root = service.root().to_path_buf();
+    let noise = std::thread::spawn(move || {
+        let mut counter = 0u64;
+        while stop.load(std::sync::atomic::Ordering::Relaxed) {
+            let _ = fs::write(noise_root.join("build.log"), counter.to_string());
+            counter += 1;
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    });
+
+    fs::write(service.root().join("external.md"), b"edited elsewhere").expect("external edit");
+
+    let event = receiver.recv_timeout(Duration::from_secs(3));
+    noisy.store(false, std::sync::atomic::Ordering::Relaxed);
+    noise.join().expect("noise thread");
+
+    let event =
+        event.expect("an external Markdown change must be reported even while other files churn");
+    assert_eq!(event.path, "external.md");
+}

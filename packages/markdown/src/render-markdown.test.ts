@@ -81,3 +81,31 @@ const proof = true
     expect(result.html.match(/data-mermaid-placeholder=/g)).toHaveLength(2)
   })
 })
+
+describe('inline math boundaries', () => {
+  const rendersMath = (source: string) => renderMarkdown(source).html.includes('katex')
+
+  it('still renders genuine inline math', () => {
+    expect(rendersMath('Real math $E = mc^2$ here')).toBe(true)
+    expect(rendersMath('$x$')).toBe(true)
+    expect(rendersMath('A fraction $\\frac{a}{b}$.')).toBe(true)
+  })
+
+  it('leaves currency amounts alone', () => {
+    // A dollar sign followed by a digit is money far more often than maths, and
+    // a reader typing prices should not watch their prose turn into equations.
+    expect(rendersMath('Prices: $5-$10 per unit')).toBe(false)
+    expect(rendersMath('Costs $5, $10')).toBe(false)
+  })
+
+  it('leaves shell variables alone', () => {
+    expect(rendersMath('Set $HOME/$USER now')).toBe(false)
+  })
+
+  it('does not swallow a link whose text contains a dollar amount', () => {
+    const html = renderMarkdown('[Buy for $5](/shop)$10').html
+    expect(html).toContain('href="/shop"')
+    expect(html).not.toContain('katex')
+  })
+})
+

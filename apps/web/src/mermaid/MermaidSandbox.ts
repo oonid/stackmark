@@ -10,20 +10,37 @@ export class MermaidSandbox {
   private readonly ready: Promise<void>
   private readonly pending = new Map<string, { resolve: (svg: string) => void; reject: (error: Error) => void; timer: number }>()
 
-  private constructor() {
+  private constructor(readyTimeoutMs: number) {
     this.frame = document.createElement('iframe')
     this.frame.setAttribute('aria-hidden', 'true')
     this.frame.tabIndex = -1
     this.frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:1024px;height:768px;border:0;opacity:0;pointer-events:none'
     this.frame.setAttribute('sandbox', 'allow-scripts')
     this.frame.src = '/generated/mermaid-renderer.html'
-    this.ready = new Promise((resolve) => this.frame.addEventListener('load', () => resolve(), { once: true }))
+    // Without a bound this promise can never settle: render() awaits it before
+    // arming its own timer, so a frame that never loads — which is exactly what
+    // a refused renderer script produces — hangs every diagram forever with no
+    // error anywhere.
+    this.ready = new Promise((resolve, reject) => {
+      const timer = window.setTimeout(
+        () => reject(new Error('The Mermaid renderer frame did not load.')),
+        readyTimeoutMs,
+      )
+      this.frame.addEventListener('load', () => { window.clearTimeout(timer); resolve() }, { once: true })
+      this.frame.addEventListener('error', () => {
+        window.clearTimeout(timer)
+        reject(new Error('The Mermaid renderer frame failed to load.'))
+      }, { once: true })
+    })
+    // Awaited by render(); this keeps a failure from surfacing as an unhandled
+    // rejection when nothing has asked for a diagram yet.
+    void this.ready.catch(() => undefined)
     window.addEventListener('message', this.receive)
     document.body.append(this.frame)
   }
 
-  static async create(): Promise<MermaidSandbox> {
-    return new MermaidSandbox()
+  static async create(readyTimeoutMs = 10_000): Promise<MermaidSandbox> {
+    return new MermaidSandbox(readyTimeoutMs)
   }
 
   async render(source: string, theme: MermaidRenderRequest['theme'] = 'default'): Promise<string> {

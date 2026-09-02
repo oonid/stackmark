@@ -20,6 +20,11 @@ use tempfile::NamedTempFile;
 use thiserror::Error;
 
 const WATCH_DEBOUNCE: Duration = Duration::from_millis(75);
+/// Upper bound on how long a batch may keep absorbing events before it is
+/// delivered. Without it the debounce window restarts on every message, so a
+/// workspace that is never quiet — an editor swap file, a sync client, a build
+/// watcher — never delivers anything at all.
+const WATCH_BATCH_MAX: Duration = Duration::from_millis(500);
 const OWN_WRITE_WINDOW: Duration = Duration::from_secs(2);
 
 #[derive(Debug, Error)]
@@ -362,8 +367,13 @@ where
             Ok(WatchMessage::Stop) | Err(_) => return,
         };
         let mut paths = event_paths(first);
+        let batch_deadline = Instant::now() + WATCH_BATCH_MAX;
         loop {
-            match receiver.recv_timeout(WATCH_DEBOUNCE) {
+            let remaining = batch_deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                break;
+            }
+            match receiver.recv_timeout(WATCH_DEBOUNCE.min(remaining)) {
                 Ok(WatchMessage::Event(event)) => paths.extend(event_paths(event)),
                 Ok(WatchMessage::Stop) | Err(mpsc::RecvTimeoutError::Disconnected) => return,
                 Err(mpsc::RecvTimeoutError::Timeout) => break,

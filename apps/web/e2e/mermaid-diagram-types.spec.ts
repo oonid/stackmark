@@ -111,14 +111,22 @@ for (const diagram of diagrams) {
 // those colours by class name. A name missing from that list is drawn with no
 // stroke: the boxes survive and the lines between them disappear, on screen and
 // in print alike.
-const unstrokedEdges = (element: SVGElement) =>
-  Array.from(element.querySelectorAll<SVGElement>('path, line'))
+const inspectEdges = (element: SVGElement) => {
+  const connectors = Array.from(element.querySelectorAll<SVGElement>('path, line'))
     .map((node) => ({
       className: String(node.getAttribute('class') ?? ''),
       stroke: getComputedStyle(node).stroke,
     }))
     .filter((node) => /edge|transition|relation|messageLine|flowchart-link|composition|aggregation|dependency|extension/i.test(node.className))
-    .filter((node) => node.stroke === 'none' || node.stroke === 'transparent')
+  return {
+    // Reported so an empty result cannot mean both "all painted" and "matched
+    // nothing". If Mermaid renames its connector classes the stylesheet stops
+    // colouring them and this filter stops finding them, which would leave the
+    // regression test green over exactly the defect it exists to catch.
+    total: connectors.length,
+    unstroked: connectors.filter((node) => node.stroke === 'none' || node.stroke === 'transparent'),
+  }
+}
 
 for (const diagram of diagrams.filter((candidate) => candidate.arrows)) {
   test(`draws visible connecting lines in a ${diagram.type} diagram`, async ({ page }) => {
@@ -128,14 +136,17 @@ for (const diagram of diagrams.filter((candidate) => candidate.arrows)) {
     await expect(preview).toContainText(diagram.labels[0], { timeout: 15_000 })
 
     // On screen first: the reader sees the preview long before any PDF.
-    expect(await preview.evaluate(unstrokedEdges), `${diagram.type} edges on screen`).toEqual([])
+    const onScreen = await preview.evaluate(inspectEdges)
+    expect(onScreen.total, `${diagram.type} must draw connectors at all`).toBeGreaterThan(0)
+    expect(onScreen.unstroked, `${diagram.type} edges on screen`).toEqual([])
 
     await page.emulateMedia({ media: 'print' })
     const inPrint = await page
       .getByTestId('print-document')
       .locator(':scope > .print-source svg')
       .first()
-      .evaluate(unstrokedEdges)
-    expect(inPrint, `${diagram.type} edges in print`).toEqual([])
+      .evaluate(inspectEdges)
+    expect(inPrint.total, `${diagram.type} must draw connectors in print`).toBeGreaterThan(0)
+    expect(inPrint.unstroked, `${diagram.type} edges in print`).toEqual([])
   })
 }
