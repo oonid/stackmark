@@ -119,7 +119,6 @@ grep -Fx '**/node_modules' "$repo_root/.dockerignore"
 grep -Fx 'dist' "$repo_root/.dockerignore"
 grep -Fx 'target' "$repo_root/.dockerignore"
 grep -Fx '*.pdf' "$repo_root/.dockerignore"
-grep -Fx '.engineering/' "$repo_root/.dockerignore"
 
 grep -F '"name": "stackmark"' "$repo_root/package.json"
 grep -F '"private": true' "$repo_root/package.json"

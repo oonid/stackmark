@@ -364,8 +364,6 @@ A later session should begin by reading, in order:
 2. `docs/engineering/specs/2026-08-04-stackedit-modernization-phase-one-design.md`;
 3. Task 5 through Task 8 in `docs/engineering/plans/2026-08-04-stackedit-modernization-stage-0.md`;
 4. `docs/engineering/evidence/stage-0.md`;
-5. `.engineering/sdd/2026-08-04-stackedit-modernization-stage-0/progress.md`;
-6. `.engineering/sdd/2026-08-04-stackedit-modernization-stage-0/task-6-report.md`;
-7. `git diff 18e4a58a` and the currently red E2E test.
+5. `git diff 18e4a58a` and the currently red E2E test.
 
 The next session must not claim Task 6 complete until the architectural choice is recorded, the red regression is resolved without weakening it, all fresh gates pass, the host smoke is recorded, and the re-review is clean.
