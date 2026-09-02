@@ -1,6 +1,5 @@
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import { open } from '@tauri-apps/plugin-dialog'
 
 const PROOF_PATH = 'stage-zero-proof.md'
 const EXTERNAL_CHANGE_EVENT = 'workspace://external-change'
@@ -16,7 +15,6 @@ export interface WorkspaceExternalChange extends WorkspaceFileMetadata {
 }
 
 export interface DesktopProofBridge {
-  openDirectory(): Promise<string | null>
   invoke(command: string, args?: Record<string, unknown>): Promise<unknown>
   listen(
     event: string,
@@ -41,10 +39,6 @@ function officialBridge(): DesktopProofBridge | undefined {
   if (!isTauri()) return undefined
 
   return {
-    async openDirectory() {
-      const selection = await open({ directory: true, multiple: false })
-      return typeof selection === 'string' ? selection : null
-    },
     invoke(command, args) {
       return invoke(command, args)
     },
@@ -61,9 +55,11 @@ export function createDesktopProofGateway(
     supported: bridge !== undefined,
     async chooseWorkspace() {
       if (!bridge) unsupported()
-      const root = await bridge.openDirectory()
+      // The application opens the picker and adopts the result itself. This
+      // side never names a path, so a compromised page cannot choose the root
+      // its own file access is confined to.
+      const root = await bridge.invoke('choose_workspace') as string | null
       if (root === null) return null
-      await bridge.invoke('set_workspace_root', { root })
       await bridge.invoke('start_workspace_watch')
       return root
     },

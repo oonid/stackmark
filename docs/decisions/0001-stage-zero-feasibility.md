@@ -43,7 +43,19 @@ The application policy must also name the scheme and host explicitly, `script-sr
 
 **This was recorded as passing before it was true.** The gate was verified only under `cargo tauri dev`, which serves the frontend over `http://localhost:1420` and so gave the frame an ordinary HTTP origin to work from. The first packaged build refused the renderer script and rendered no diagrams at all, in the application and in its printed output. Development evidence did not cover the path that ships, and the nonce workaround had been masking the same constraint it appeared to solve.
 
-### 4. Workspace access is confined by the kernel, not by string checks
+### 4. Workspace access is confined by the kernel, to a root the user chose
+
+The application opens the folder picker itself and adopts the result. The web
+layer asks for a picker but never supplies a path.
+
+This was not the original arrangement, and the difference matters more than it
+looks. The frontend used to open the dialog and hand the chosen path back to
+Rust, which accepted any directory that existed. The confinement below was
+airtight, but only ever relative to a root the untrusted side named — so
+anything able to run script in the main frame could adopt `/` as the workspace
+and reach every Markdown file on the disk. Owning the picker is what makes the
+root the user's choice rather than the page's, and it let the window drop the
+dialog capability altogether: its permissions are now strictly fewer than before.
 
 On Linux the service holds an open root directory descriptor and resolves below it with `openat2` using `RESOLVE_BENEATH`, `NO_MAGICLINKS` and `NO_SYMLINKS`. Writes go to a temporary file in the target directory, are synced, and are persisted atomically, with directory identity checked before and after. A rename-plus-symlink-swap regression must fail without writing outside the workspace.
 

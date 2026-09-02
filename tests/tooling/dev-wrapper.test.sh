@@ -79,6 +79,13 @@ grep -F 'chown -R stackmark:stackmark /workspace /pnpm' "$repo_root/docker/front
 # renderer script. Chromium resolves 'self' differently there, so no browser test
 # reproduces this: the explicit scheme source is the only thing standing between
 # a release build and diagrams that never appear.
+# The window may ask for a picker but may not name a directory, and it no longer
+# needs the dialog plugin at all. A capability that lets the untrusted side
+# choose the root would undo the confinement built below it.
+grep -F 'allow-choose-workspace' "$repo_root/apps/desktop/src-tauri/capabilities/main.json"
+! grep -F 'set_workspace_root' "$repo_root/apps/desktop/src-tauri/capabilities/main.json"
+! grep -F 'dialog:allow-open' "$repo_root/apps/desktop/src-tauri/capabilities/main.json"
+
 grep -F "script-src 'self' tauri://localhost" "$repo_root/apps/desktop/src-tauri/tauri.conf.json"
 
 # The browser build shipped no policy at all, so an untrusted document could

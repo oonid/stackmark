@@ -1,7 +1,7 @@
 [[permission]]
-identifier = "allow-set-workspace-root"
-description = "Allows the main window to set the canonical Markdown workspace root."
-commands.allow = ["set_workspace_root"]
+identifier = "allow-choose-workspace"
+description = "Allows the main window to ask the application to open a folder picker and adopt the chosen directory. The window cannot name the directory itself."
+commands.allow = ["choose_workspace"]
 
 [[permission]]
 identifier = "allow-read-markdown"

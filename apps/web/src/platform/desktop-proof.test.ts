@@ -13,8 +13,8 @@ describe('desktop proof gateway', () => {
     const unlisten = vi.fn()
     const listener = vi.fn()
     const bridge: DesktopProofBridge = {
-      openDirectory: vi.fn().mockResolvedValue('/tmp/stackmark-proof'),
       invoke: vi.fn(async (command: string) => {
+        if (command === 'choose_workspace') return '/tmp/stackmark-proof'
         if (command === 'atomic_write_markdown') {
           return {
             path: 'stage-zero-proof.md',
@@ -52,9 +52,9 @@ describe('desktop proof gateway', () => {
       sha256: 'external-hash',
       mtimeUnixMs: 84,
     })
-    expect(bridge.invoke).toHaveBeenNthCalledWith(1, 'set_workspace_root', {
-      root: '/tmp/stackmark-proof',
-    })
+    // The application opens the picker; this side never supplies a path, so
+    // there is no argument here for a compromised page to control.
+    expect(bridge.invoke).toHaveBeenNthCalledWith(1, 'choose_workspace')
     expect(bridge.invoke).toHaveBeenNthCalledWith(2, 'start_workspace_watch')
     expect(bridge.invoke).toHaveBeenNthCalledWith(3, 'atomic_write_markdown', {
       path: 'stage-zero-proof.md',
@@ -64,13 +64,14 @@ describe('desktop proof gateway', () => {
 
   it('does not configure a workspace when folder selection is cancelled', async () => {
     const bridge: DesktopProofBridge = {
-      openDirectory: vi.fn().mockResolvedValue(null),
-      invoke: vi.fn(),
+      invoke: vi.fn(async () => null),
       listen: vi.fn(),
     }
     const gateway = createDesktopProofGateway(bridge)
 
     await expect(gateway.chooseWorkspace()).resolves.toBeNull()
-    expect(bridge.invoke).not.toHaveBeenCalled()
+    // Only the picker ran: a cancelled selection must not start a watcher.
+    expect(bridge.invoke).toHaveBeenCalledTimes(1)
+    expect(bridge.invoke).toHaveBeenCalledWith('choose_workspace')
   })
 })
