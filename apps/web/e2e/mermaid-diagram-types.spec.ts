@@ -105,3 +105,37 @@ for (const diagram of diagrams) {
     expect(rendered.externalRefs, 'no external URL references').toBe(false)
   })
 }
+
+// Mermaid names its connectors differently per diagram type, and the sanitizer
+// strips the stylesheet that would colour them, so the application re-supplies
+// those colours by class name. A name missing from that list is drawn with no
+// stroke: the boxes survive and the lines between them disappear, on screen and
+// in print alike.
+const unstrokedEdges = (element: SVGElement) =>
+  Array.from(element.querySelectorAll<SVGElement>('path, line'))
+    .map((node) => ({
+      className: String(node.getAttribute('class') ?? ''),
+      stroke: getComputedStyle(node).stroke,
+    }))
+    .filter((node) => /edge|transition|relation|messageLine|flowchart-link|composition|aggregation|dependency|extension/i.test(node.className))
+    .filter((node) => node.stroke === 'none' || node.stroke === 'transparent')
+
+for (const diagram of diagrams.filter((candidate) => candidate.arrows)) {
+  test(`draws visible connecting lines in a ${diagram.type} diagram`, async ({ page }) => {
+    await page.goto('/')
+    await page.getByTestId('markdown-source').fill(fence(diagram.source))
+    const preview = page.getByTestId('mermaid-static').locator('svg')
+    await expect(preview).toContainText(diagram.labels[0], { timeout: 15_000 })
+
+    // On screen first: the reader sees the preview long before any PDF.
+    expect(await preview.evaluate(unstrokedEdges), `${diagram.type} edges on screen`).toEqual([])
+
+    await page.emulateMedia({ media: 'print' })
+    const inPrint = await page
+      .getByTestId('print-document')
+      .locator(':scope > .print-source svg')
+      .first()
+      .evaluate(unstrokedEdges)
+    expect(inPrint, `${diagram.type} edges in print`).toEqual([])
+  })
+}

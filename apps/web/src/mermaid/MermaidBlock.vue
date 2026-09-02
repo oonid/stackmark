@@ -64,11 +64,24 @@ onBeforeUnmount(() => { generation += 1 })
   stroke: #475569;
 }
 
+/*
+ * Mermaid names its connectors differently per diagram type and the sanitizer
+ * removes the stylesheet that would colour them, so each name has to be listed.
+ * The same list appears in the print document; a name missing from either place
+ * leaves that diagram's boxes on screen with no lines between them.
+ */
 .mermaid-static :deep(.edgePath path),
 .mermaid-static :deep(.flowchart-link),
 .mermaid-static :deep(.messageLine0),
 .mermaid-static :deep(.messageLine1),
-.mermaid-static :deep(.relationshipLine) {
+.mermaid-static :deep(.relationshipLine),
+.mermaid-static :deep(.transition),
+.mermaid-static :deep(.relation),
+.mermaid-static :deep(.composition),
+.mermaid-static :deep(.aggregation),
+.mermaid-static :deep(.dependency),
+.mermaid-static :deep(.extension),
+.mermaid-static :deep([class*='edge-pattern']) {
   fill: none;
   stroke: #475569;
 }

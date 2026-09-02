@@ -91,11 +91,24 @@
   fill: #fff;
 }
 
+/*
+ * Mermaid names its connectors differently per diagram type, and the sanitizer
+ * removes the stylesheet that would otherwise colour them, so every name has to
+ * appear here. A connector this list misses is drawn with no stroke: the boxes
+ * survive and the lines between them vanish.
+ */
 .stackmark-print-document .mermaid-static .edgePath path,
 .stackmark-print-document .mermaid-static .flowchart-link,
 .stackmark-print-document .mermaid-static .messageLine0,
 .stackmark-print-document .mermaid-static .messageLine1,
-.stackmark-print-document .mermaid-static .relationshipLine {
+.stackmark-print-document .mermaid-static .relationshipLine,
+.stackmark-print-document .mermaid-static .transition,
+.stackmark-print-document .mermaid-static .relation,
+.stackmark-print-document .mermaid-static .composition,
+.stackmark-print-document .mermaid-static .aggregation,
+.stackmark-print-document .mermaid-static .dependency,
+.stackmark-print-document .mermaid-static .extension,
+.stackmark-print-document .mermaid-static [class*='edge-pattern'] {
   fill: none;
   stroke: #475569;
 }
