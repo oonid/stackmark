@@ -242,3 +242,39 @@ This is the first PDF produced end to end by the installed product rather than a
 ### Still to run
 
 Step 6, the offline product path against the installed build: editing, KaTeX, Mermaid, pagination and Save to PDF with external networking disabled. Any external request is a failed gate.
+
+## Task 8 — Stage 0 closure
+
+### Fresh automated suite (2026-09-02)
+
+Every gate re-run in one pass at `7e648ce6`, not carried over from earlier task output. All exited zero.
+
+| Command | Result |
+|---|---|
+| `bash tests/tooling/dev-wrapper.test.sh` | PASS |
+| `./dev versions` | Node v24.18.0, pnpm 11.20.0, from the container |
+| `./dev lint` | PASS, `vue-tsc --noEmit` and ESLint |
+| `./dev unit` | PASS, 62 tests: 16 Markdown, 35 print, 11 web |
+| `./dev e2e` | PASS, 17 Chromium tests |
+| `./dev frontend-build` | PASS |
+| `cargo fmt -- --check` | PASS |
+| `cargo test` | PASS, 14 tests |
+| `./dev desktop-build` | PASS |
+| `scripts/inspect-deb.sh` | PASS |
+| `git diff --check` | PASS |
+
+Artifact `stackmark_0.1.0-stage0_amd64.deb`, SHA-256 `52d12b2b02285eab20dc913bc593e699558a0f3a9b5d94b29980f877c2595b26`. That differs from the previous build of identical code, which restates that the build is not reproducible and a checksum identifies one artifact rather than a commit.
+
+### Stage 0 gate matrix
+
+| Gate | Automated evidence | Host evidence | Result |
+|---|---|---|---|
+| Docker-only JavaScript | Wrapper contract; Node and pnpm versions reported from inside the container | No host Node or pnpm participates; `tauri.conf.json` declares no `beforeDevCommand` | **PASS** |
+| Shared web and Tauri UI | Production build; 17 browser tests | The same screen renders in Chromium and in WebKitGTK, in development and from the installed package | **PASS** |
+| Desktop files | 14 Rust tests covering path confinement, atomic replacement, symlink-swap rejection, own-write suppression, watcher restart | Folder dialog, atomic save, and an external edit whose reported hash matched the file on disk exactly — verified in development and again from the installed package | **PASS** |
+| KaTeX and Mermaid | Unit, adversarial and browser tests, including all five diagram types rendered through the real sandbox | Renders in WebKitGTK in development and, after the content-policy fix, from the installed package | **PASS**, with one qualification: the four non-flowchart diagram types are proven in Chromium only; WebKitGTK has rendered a flowchart |
+| Pagination and printing | Browser assertions; native PDF asserted at A4 from the document's own `@page` | The installed application exported two A4 pages, complete text, a vector diagram, the light-paper palette and embedded KaTeX subsets, with no content outside the page box | **PASS with deviations D1, D2, D3** |
+| Debian package | Builder image with every tool pinned and verified during build; `inspect-deb.sh`, its own failure modes exercised including a package tampered with a planted Node binary | Installs with no additional packages pulled, launches from a terminal and from the application menu, removes leaving no binary, desktop entry, icon or `rc` state | **PASS** |
+| No-network product path | The production bundle makes no remote `fetch`, XHR, WebSocket or `importScripts` call; all 59 fonts are bundled; no directive in the production policy names an external origin | Development build passes offline. **The installed build has not been run offline** | **OUTSTANDING** |
+
+The single outstanding gate is the offline path against the installed build. It is close to structurally guaranteed — the policy permits no external origin and the bundle makes no remote call — but that is the same shape of reasoning that recorded the Mermaid gate as passing before it was true, so it is recorded as outstanding rather than inferred.

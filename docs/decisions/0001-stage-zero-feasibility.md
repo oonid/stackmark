@@ -1,6 +1,6 @@
 # 0001 — StackMark Stage 0 feasibility
 
-- **Status:** Accepted for the application architecture. The Stage 0 go/no-go is deferred: the Debian packaging gate is only partly run.
+- **Status:** Accepted. **Conditional go**, with one gate outstanding and four deviations named.
 - **Date:** 2026-08-08, revised 2026-09-02
 - **Note:** written before the fork was named. The product is StackMark; see ADR 0002.
 - **Scope:** The Stage 0 vertical feasibility slice on `feat/stage-zero`. Not the phase-one product.
@@ -88,9 +88,13 @@ The host has 2.10.1 against the plan's 2.11.4. Dev mode is unaffected. The relea
 
 ## Decision
 
-**Conditional go for the application architecture.** Docker-only tooling, the shared frontend, Mermaid isolation, workspace path safety, atomic saves, external-change detection, and system printing are all demonstrated on the reference host with automated and host evidence.
+**Conditional go.** Every mandatory Stage 0 gate is demonstrated on the reference host except one, and that one is a confirmation rather than an open question.
 
-**The Stage 0 go/no-go is not yet decidable.** Debian packaging is a mandatory gate in the Stage 0 matrix with no acceptable fallback, and it has not been attempted. This ADR must be revisited when Task 7 completes, and only then can Stage 1 planning be authorised.
+Docker-only tooling, the shared frontend, Mermaid isolation, workspace path safety confined by the kernel, atomic saves, external-change detection, system printing, and Debian packaging are all proven with automated and host evidence. The package installs on KDE neon with its declared dependencies satisfied, launches from a terminal and from the application menu, renders and prints correctly, and removes cleanly.
+
+**The condition:** the no-network path has not been exercised against the installed build. The production policy names no external origin and the bundle makes no remote call, so the gate is close to structurally guaranteed — but the Mermaid gate was also "obviously fine" until it was packaged, so it stays outstanding until observed. Should that check fail, this becomes a conditional go with a named fallback rather than a plain one; it cannot become a no-go, because nothing in the product depends on the network.
+
+Stage 1 planning is authorised on this basis, subject to the conditions below.
 
 Conditions attached to the architectural go:
 
