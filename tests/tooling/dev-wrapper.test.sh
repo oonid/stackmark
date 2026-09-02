@@ -81,6 +81,14 @@ grep -F 'chown -R stackmark:stackmark /workspace /pnpm' "$repo_root/docker/front
 # a release build and diagrams that never appear.
 grep -F "script-src 'self' tauri://localhost" "$repo_root/apps/desktop/src-tauri/tauri.conf.json"
 
+# The browser build shipped no policy at all, so an untrusted document could
+# fetch, frame and connect freely there while the desktop build was carefully
+# constrained. A meta policy binds only the containing document, which is why it
+# does not disturb the sandboxed renderer frame the way a response header does.
+grep -F "http-equiv=\"Content-Security-Policy\"" "$repo_root/apps/web/index.html"
+grep -F "script-src 'self'" "$repo_root/apps/web/index.html"
+grep -F "object-src 'none'" "$repo_root/apps/web/index.html"
+
 grep -Fx 'FROM ubuntu:24.04' "$repo_root/docker/tauri-builder.Dockerfile"
 grep -F 'ENV STACKMARK_IN_BUILDER=1' "$repo_root/docker/tauri-builder.Dockerfile"
 grep -F -- '--default-toolchain 1.88.0' "$repo_root/docker/tauri-builder.Dockerfile"
