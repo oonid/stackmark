@@ -1,7 +1,8 @@
-# 0001 — StackEdit Stage 0 feasibility
+# 0001 — StackMark Stage 0 feasibility
 
-- **Status:** Accepted for the application architecture. The Stage 0 go/no-go is deferred: the Debian packaging gate has not been run.
-- **Date:** 2026-08-08
+- **Status:** Accepted for the application architecture. The Stage 0 go/no-go is deferred: the Debian packaging gate is only partly run.
+- **Date:** 2026-08-08, revised 2026-09-02
+- **Note:** written before the fork was named. The product is StackMark; see ADR 0002.
 - **Scope:** The Stage 0 vertical feasibility slice on `feat/stage-zero`. Not the phase-one product.
 
 ## Context
@@ -38,6 +39,10 @@ Mermaid executes in an iframe created with exactly `sandbox="allow-scripts"`, fr
 
 A nonce is used rather than `script-src 'self'` because a sandboxed frame without `allow-same-origin` has an opaque origin, and WebKitGTK does not consistently authorise an external script under `'self'` in that state. This was found by the desktop gate failing where Chromium passed.
 
+The application policy must also name the scheme and host explicitly, `script-src 'self' tauri://localhost`. The nonce alone is not sufficient: the policy the application serves applies to the renderer document as well, and with no `script-src` of its own it fell back to `default-src 'self'`, which an opaque-origin frame can never satisfy. For the main document the explicit source grants nothing new, since there `'self'` already is `tauri://localhost`.
+
+**This was recorded as passing before it was true.** The gate was verified only under `cargo tauri dev`, which serves the frontend over `http://localhost:1420` and so gave the frame an ordinary HTTP origin to work from. The first packaged build refused the renderer script and rendered no diagrams at all, in the application and in its printed output. Development evidence did not cover the path that ships, and the nonce workaround had been masking the same constraint it appeared to solve.
+
 ### 4. Workspace access is confined by the kernel, not by string checks
 
 On Linux the service holds an open root directory descriptor and resolves below it with `openat2` using `RESOLVE_BENEATH`, `NO_MAGICLINKS` and `NO_SYMLINKS`. Writes go to a temporary file in the target directory, are synced, and are persisted atomically, with directory identity checked before and after. A rename-plus-symlink-swap regression must fail without writing outside the workspace.
@@ -72,9 +77,13 @@ Paged.js 0.4.3 also requires a local patch to paginate at all: `createBreakToken
 
 The host has 2.10.1 against the plan's 2.11.4. Dev mode is unaffected. The release builder must pin the intended version so the host's does not matter.
 
-## Gates not yet run
+## Gates partly run
 
-- **Debian packaging** — the builder image, `.deb` production, artifact inspection, installation on KDE neon, launch from terminal and application menu, and removal. Task 7.
+- **Debian packaging** — the builder image, `.deb` production and artifact inspection pass. Installation on KDE neon succeeded with no additional packages pulled, which proves the declared runtime dependencies are satisfiable and not merely declared, and removal left no binary, desktop entry or icon behind. The application launches from a terminal and from the application menu.
+
+  The first packaged run also failed the Mermaid gate outright, for the reason recorded in decision 3. That is fixed and confirmed by running the release binary, which serves the embedded frontend under the production policy without any installation.
+
+  Still to run: the folder, save and external-change checks against the installed build, and a printed PDF from it.
 - **Offline behaviour of the installed package.** Offline behaviour of the development build passes: editing, KaTeX, Mermaid and pagination work with external networking disabled, and the exported PDF is structurally identical to the online one. The production bundle makes no remote request.
 
 ## Decision
@@ -85,6 +94,7 @@ The host has 2.10.1 against the plan's 2.11.4. Dev mode is unaffected. The relea
 
 Conditions attached to the architectural go:
 
+0. **A gate is not passed until it is exercised in a packaged build.** Development mode serves the frontend over `http://localhost:1420`; the product serves it over a custom scheme, and the two differ in ways that decide whether the application works at all. The Mermaid gate was recorded as passing on development evidence and the first packaged build rendered no diagrams. Every gate resting only on `cargo tauri dev` should be treated as unproven. The release binary can be run directly, without installing anything, which makes this cheap to honour.
 1. Phase one must not promise a page-accurate desktop preview, page numbers, or running headers on Linux (D1, D2, D3).
 2. The Paged.js patch must be revisited on any dependency upgrade, and the preview's self-verification kept — it is the only thing standing between a silent content loss and the reader.
 3. The release builder must pin its own Tauri CLI (D4).

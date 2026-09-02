@@ -179,3 +179,46 @@ Current unresolved print-preview evidence (superseded by the analysis above; ret
 - The strengthened exact-page regression is intentionally RED: expected two populated `.pagedjs_page` elements, received six. Therefore Task 6 and the complete browser suite must not be reported green.
 
 The detailed experiment log, risks, alternatives, and continuation commands are recorded in `docs/engineering/handoffs/2026-08-05-stage-0-task-6-print-tauri.md`. The recommended Stage 0 fallback is a native-authoritative continuous screen proof with system print/PDF as the only authoritative pagination path. Paged.js may instead be feature-gated, patched, or replaced only after an explicit architectural decision.
+
+## Task 7 — containerized Debian packaging (2026-09-02)
+
+### Build and inspection
+
+The release builder is Ubuntu 24.04, matching the KDE neon base, with Node 24.18.0, pnpm 11.20.0, Rust 1.88.0 and Tauri CLI 2.11.4 pinned in the image and verified during the build. The host's Tauri CLI is 2.10.1 and does not participate.
+
+`./dev desktop-build` produces `stackmark_0.1.0-stage0_amd64.deb`, package `stackmark`, depending on `libwebkit2gtk-4.1-0` and `libgtk-3-0`, installing `/usr/bin/stackmark` and a `StackMark` menu entry. `scripts/inspect-deb.sh` passes and records a SHA-256 beside the artifact. Its own failure modes were exercised: no argument, two packages, a missing file, a file that is not a package, and a package tampered with a planted `node` binary, which it rejects.
+
+The build corrected two things it would otherwise have shipped. The bundle category must come from Tauri's fixed set rather than free text. The hand-written dependency list duplicated what Tauri derives from the linked libraries and added `libayatana-appindicator3-1`, which `objdump` shows the binary does not link, so it would have forced an unnecessary install on every user; the derived list is used instead.
+
+Successive builds of unchanged application code produce different checksums, so **the build is not reproducible**. A checksum identifies one artifact, not the code at a commit.
+
+### Host installation
+
+Installation on KDE neon succeeded and pulled **no additional packages**, which proves the declared runtime dependencies are satisfiable rather than merely declared. `apt remove` left no binary, desktop entry or icon, and no `rc` state. The application launches from a terminal and from the KDE application menu.
+
+### The packaged build rendered no diagrams
+
+The first packaged run failed the Mermaid gate. The webview refused the renderer script:
+
+```text
+Refused to load tauri://localhost/generated/mermaid-renderer.iife.js
+because it does not appear in the script-src directive
+```
+
+The renderer frame is sandboxed without `allow-same-origin`, so its origin is opaque and `'self'` matches nothing from inside it. The application policy declared no `script-src`, so it fell back to `default-src 'self'`, which that frame could never satisfy. The policy now names the scheme explicitly, `script-src 'self' tauri://localhost`, which grants the main document nothing new because there `'self'` already is `tauri://localhost`. Confirmed fixed by running the release binary.
+
+The printed output lacked the diagram for the same reason: the print path only receives sanitized SVG handed back by the sandbox, so one cause produced both symptoms.
+
+Two diagnoses preceded the right one. The first blamed the policy text and was disproved by running development under the production policy, where diagrams rendered. The second blamed Tauri's compile-time rewriting of asset policies and was disproved by a build with `dangerousDisableAssetCspModification`, and then by the served document, whose policy and nonce arrived intact and matching. Only reading the console error identified the cause, which is the same lesson the print work produced: instrument the running program rather than reason from the source.
+
+### Why no test caught it
+
+The browser test named for this policy applied it to the main document alone, so it exercised the parent frame and never the child, and its copy of the policy had drifted from the configuration. It now reads the real policy and applies it to every response.
+
+That test still cannot catch this defect. Chromium resolves `'self'` for an opaque-origin frame differently and renders the diagram whether or not the fix is present, verified by reverting the fix and watching it pass. The regression guard is therefore in the wrapper contract, which asserts the explicit scheme source and does fail without it. The behaviour itself is observable only in a packaged build on WebKitGTK.
+
+**The Mermaid gate had been recorded as passing on development evidence alone.** Development serves the frontend over `http://localhost:1420`, which gave the sandboxed frame an ordinary HTTP origin; packaging removed that and the gate failed. The nonce design had been adopted because `script-src 'self'` already failed on WebKitGTK, so the workaround was masking the same constraint it appeared to solve.
+
+### Still to run
+
+Against an installed build carrying the fix: folder selection, save, external-change detection, and a printed A4 PDF verified with `pdfinfo` and `pdftotext`. Then Step 6, the offline product path. The release binary can be run directly for all of these except the checks that specifically exercise installation.
