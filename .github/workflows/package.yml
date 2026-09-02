@@ -1,0 +1,32 @@
+# Builds the Debian package and refuses to publish one that fails inspection.
+#
+# Kept out of CI because a release build is slow and most changes cannot affect
+# it. ADR 0001 condition 0 says a gate is not passed until it is exercised in a
+# packaged build, so run this before trusting a tag.
+name: Package
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deb:
+    name: Debian package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./dev install
+      # The builder image pins its own Tauri CLI, Node and Rust, so the host's
+      # versions cannot reach the artifact.
+      - run: ./dev desktop-build
+      - name: Inspect the artifact
+        run: scripts/inspect-deb.sh apps/desktop/src-tauri/target/release/bundle/deb/*.deb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stackmark-deb
+          path: apps/desktop/src-tauri/target/release/bundle/deb/*.deb
+          retention-days: 14
