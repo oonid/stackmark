@@ -20,7 +20,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' customprotocol: asset:; connect-src ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src 'self' data: blob:; object-src 'none'",
+      "csp": "default-src 'self' customprotocol: asset:; script-src 'self' tauri://localhost; connect-src ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src 'self' data: blob:; object-src 'none'",
       "devCsp": "default-src 'self' http://localhost:1420; connect-src ipc: http://ipc.localhost http://localhost:1420 ws://localhost:1420; img-src 'self' http://localhost:1420 data:; style-src 'self' 'unsafe-inline' http://localhost:1420; script-src 'self' 'unsafe-eval' http://localhost:1420; font-src 'self' http://localhost:1420 data:; frame-src 'self' data: blob:; object-src 'none'"
     }
   },

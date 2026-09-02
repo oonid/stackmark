@@ -74,6 +74,13 @@ grep -F 'USER stackmark' "$repo_root/docker/frontend.Dockerfile"
 grep -F 'mkdir -p /workspace/node_modules /pnpm/store' "$repo_root/docker/frontend.Dockerfile"
 grep -F 'chown -R stackmark:stackmark /workspace /pnpm' "$repo_root/docker/frontend.Dockerfile"
 
+# The Mermaid renderer runs in a sandboxed frame, which has an opaque origin, so
+# 'self' cannot match from inside it and the packaged application refuses the
+# renderer script. Chromium resolves 'self' differently there, so no browser test
+# reproduces this: the explicit scheme source is the only thing standing between
+# a release build and diagrams that never appear.
+grep -F "script-src 'self' tauri://localhost" "$repo_root/apps/desktop/src-tauri/tauri.conf.json"
+
 grep -Fx 'FROM ubuntu:24.04' "$repo_root/docker/tauri-builder.Dockerfile"
 grep -F 'ENV STACKMARK_IN_BUILDER=1' "$repo_root/docker/tauri-builder.Dockerfile"
 grep -F -- '--default-toolchain 1.88.0' "$repo_root/docker/tauri-builder.Dockerfile"

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
 import { expect, test } from '@playwright/test'
 
 test('renders Mermaid as inert sanitized SVG in an opaque sandbox', async ({ page }) => {
@@ -118,14 +121,19 @@ test('renders from an opaque external sandbox document under the restrictive Tau
   expect(nonce).toBeTruthy()
   expect(rendererHtml).toContain(`<script nonce="${nonce}" src="/generated/mermaid-renderer.iife.js"`)
 
-  await page.route('**/', async (route) => {
+  // The packaged application delivers this policy as a response header on every
+  // asset it serves, the renderer document included. Applying it only to the
+  // main document tested the parent and never the child, which is how a
+  // packaged build that refused the renderer script passed this gate.
+  const productionCsp = JSON.parse(
+    readFileSync(fileURLToPath(new URL('../../desktop/src-tauri/tauri.conf.json', import.meta.url)), 'utf8'),
+  ).app.security.csp as string
+
+  await page.route('**/*', async (route) => {
     const response = await route.fetch()
     await route.fulfill({
       response,
-      headers: {
-        ...response.headers(),
-        'content-security-policy': "default-src 'self' customprotocol: asset:; connect-src ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src 'self'; object-src 'none'",
-      },
+      headers: { ...response.headers(), 'content-security-policy': productionCsp },
     })
   })
   await page.goto('/')
