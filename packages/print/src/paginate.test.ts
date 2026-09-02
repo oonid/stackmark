@@ -45,6 +45,18 @@ describe('findDroppedText', () => {
     expect(findDroppedText(source, split)).toEqual([])
   })
 
+  it('detects a dropped run whose text also occurs elsewhere', () => {
+    // Searching for each chunk anywhere in the output is blind to repetitive
+    // documents: a dropped table row is found again in the row above it. Tables,
+    // code and lists are exactly what the engine breaks worst on, and the patch
+    // this guards turns a crash into silent truncation rather than an error.
+    const row = 'ledger entry alpha beta gamma delta '
+    const source = row.repeat(40)
+    const paged = row.repeat(35)
+
+    expect(findDroppedText(source, paged).length).toBeGreaterThan(0)
+  })
+
   it('tolerates text duplicated into an overflow area', () => {
     const source = long('alpha beta gamma delta epsilon ')
 

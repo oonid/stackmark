@@ -85,8 +85,10 @@ const COMPARISON_CHUNK = 40
  * check immune to three things that are not content loss: adjacent elements
  * whose text runs together in one tree but not the other (`<td>a</td><td>b</td>`
  * yields `ab`), a word split across a page boundary, and text duplicated into
- * an engine's overflow area. Genuine loss removes a run of characters outright,
- * so the chunk containing it stops appearing anywhere in the output.
+ * an engine's overflow area. Chunks are matched in order, so a run that the
+ * engine dropped is reported even in repetitive documents, where searching the
+ * whole output for each chunk independently would find the missing text again
+ * in an identical row above it.
  */
 export function findDroppedText(sourceText: string, pagedText: string): string[] {
   const source = normalizeForComparison(sourceText)
@@ -97,13 +99,21 @@ export function findDroppedText(sourceText: string, pagedText: string): string[]
   }
 
   const missing: string[] = []
+  // Each chunk must appear *after* the previous one. Searching the whole output
+  // for every chunk independently is blind to repetitive documents: a dropped
+  // table row is simply found again in the row above it, and tables, code and
+  // lists are exactly what the engine breaks worst on.
+  let searchFrom = 0
   for (let start = 0; start + COMPARISON_CHUNK <= source.length; start += COMPARISON_CHUNK) {
     const chunk = source.slice(start, start + COMPARISON_CHUNK)
-    if (!paged.includes(chunk)) missing.push(chunk)
+    const found = paged.indexOf(chunk, searchFrom)
+    if (found === -1) missing.push(chunk)
+    else searchFrom = found + chunk.length
   }
   // The tail is shorter than a chunk, so check it inside a full-width window.
+  // It may legitimately sit before `searchFrom` when the engine duplicated text.
   const tail = source.slice(-COMPARISON_CHUNK)
-  if (!paged.includes(tail)) missing.push(tail)
+  if (paged.indexOf(tail, searchFrom) === -1 && !paged.includes(tail)) missing.push(tail)
   return [...new Set(missing)]
 }
 
