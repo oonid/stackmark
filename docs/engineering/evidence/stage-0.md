@@ -219,6 +219,26 @@ That test still cannot catch this defect. Chromium resolves `'self'` for an opaq
 
 **The Mermaid gate had been recorded as passing on development evidence alone.** Development serves the frontend over `http://localhost:1420`, which gave the sandboxed frame an ordinary HTTP origin; packaging removed that and the gate failed. The nonce design had been adopted because `script-src 'self'` already failed on WebKitGTK, so the workaround was masking the same constraint it appeared to solve.
 
+### Installed build carrying the fix — PASS (2026-09-02)
+
+Package `676c342e788439e856218d0d786022d1393a9f02abdd944cbd5337d1fd4d06ca`, built without the devtools feature, installed with `apt` and removed afterwards.
+
+- Launches from a terminal and from the KDE application menu.
+- **Mermaid renders**, closing the failure the first packaged build exposed.
+- The webview inspector is absent, confirming the diagnostic feature did not ship.
+- Saving produced **no external-change event**, and a subsequent external edit produced hash `2fe9fc1ca9e2ff55311f03b2a5d64911797804abc5957d7b50f4f6b89918ffd5`, which matches the file on disk exactly. Own-write suppression and external detection both hold in the packaged build.
+- The save hash differs from earlier runs because the seed fixture's text changed with the rename, not because the write changed.
+
+The PDF exported from the installed application through the GTK dialog with A4 selected:
+
+- 2 pages, 595 × 842 pt (A4), zero words outside the page box.
+- Content complete, including the sentence that spans the page break.
+- The Mermaid diagram present as **vector** path operations, 388 of them — the same count the development-mode PDF produced, so the print path is unchanged by packaging.
+- The light-paper Mermaid palette present: node fill `#f8fafc`, stroke `#475569`.
+- KaTeX fonts embedded as subsets.
+
+This is the first PDF produced end to end by the installed product rather than a development build.
+
 ### Still to run
 
-Against an installed build carrying the fix: folder selection, save, external-change detection, and a printed A4 PDF verified with `pdfinfo` and `pdftotext`. Then Step 6, the offline product path. The release binary can be run directly for all of these except the checks that specifically exercise installation.
+Step 6, the offline product path against the installed build: editing, KaTeX, Mermaid, pagination and Save to PDF with external networking disabled. Any external request is a failed gate.
