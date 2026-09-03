@@ -26,9 +26,15 @@ importers:
 
   apps/web:
     dependencies:
+      '@stackmark/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@stackmark/markdown':
         specifier: workspace:*
         version: link:../../packages/markdown
+      '@stackmark/platform':
+        specifier: workspace:*
+        version: link:../../packages/platform
       '@stackmark/print':
         specifier: workspace:*
         version: link:../../packages/print

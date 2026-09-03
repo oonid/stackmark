@@ -1,0 +1,5 @@
+export * from './contracts'
+export { createWebWorkspaceHost } from './web/workspace-host'
+export { createWebDocumentStore, openDocumentDatabase } from './web/document-store'
+export { createTauriWorkspaceHost } from './tauri/workspace-host'
+export { createTauriDocumentStore } from './tauri/document-store'

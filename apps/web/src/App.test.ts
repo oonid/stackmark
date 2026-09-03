@@ -139,3 +139,36 @@ After`)
     }
   })
 })
+
+describe('the print fallback seam', () => {
+  it('is not reachable from a URL in a production build', async () => {
+    // The parameter exists so a browser test can reach the fallback path. In a
+    // shipped build it would be a backdoor: any user landing on that query
+    // string gets degraded printing. `import.meta.env.DEV` is replaced at build
+    // time, so the whole branch is removed from the production bundle rather
+    // than merely being guarded at runtime.
+    vi.stubEnv('DEV', false)
+    window.history.replaceState({}, '', '/?printFallback=1')
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'PrintProof' }).props('forceFallback')).toBe(false)
+
+    vi.unstubAllEnvs()
+    window.history.replaceState({}, '', '/')
+  })
+
+  it('is reachable in development, which is what the browser test uses', async () => {
+    vi.stubEnv('DEV', true)
+    window.history.replaceState({}, '', '/?printFallback=1')
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'PrintProof' }).props('forceFallback')).toBe(true)
+
+    vi.unstubAllEnvs()
+    window.history.replaceState({}, '', '/')
+  })
+})
