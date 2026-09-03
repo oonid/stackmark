@@ -9,7 +9,7 @@ use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::workspace::{FileMetadata, WorkspaceService};
-use crate::{lock_error, DesktopState};
+use crate::DesktopState;
 
 /// Opens the folder picker and adopts the chosen directory as the workspace.
 ///
@@ -51,9 +51,7 @@ pub async fn choose_workspace(
 #[specta::specta]
 pub fn current_workspace(state: State<'_, DesktopState>) -> Result<Option<String>, String> {
     Ok(state
-        .workspace
-        .lock()
-        .map_err(|_| lock_error("workspace"))?
+        .workspace_guard()
         .as_ref()
         .map(|workspace| workspace.root().display().to_string()))
 }
@@ -90,18 +88,13 @@ pub fn start_workspace_watch(app: AppHandle, state: State<'_, DesktopState>) -> 
             let _ = app.emit_to("main", crate::EXTERNAL_CHANGE_EVENT, event);
         })
         .map_err(|error| error.to_string())?;
-    *state
-        .watch
-        .lock()
-        .map_err(|_| lock_error("workspace watch"))? = Some(watch);
+    *state.watch_guard() = Some(watch);
     Ok(())
 }
 
 fn require_workspace(state: &State<'_, DesktopState>) -> Result<WorkspaceService, String> {
     state
-        .workspace
-        .lock()
-        .map_err(|_| lock_error("workspace"))?
+        .workspace_guard()
         .clone()
         .ok_or_else(|| "choose a workspace first".to_owned())
 }

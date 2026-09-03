@@ -1,8 +1,10 @@
 pub mod commands;
+pub mod error;
+pub mod metadata;
 pub mod workspace;
 
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 
 use tauri::Manager;
 use workspace::{WorkspaceService, WorkspaceWatch};
@@ -17,8 +19,25 @@ pub struct DesktopState {
     pub watch: Mutex<Option<WorkspaceWatch>>,
 }
 
-pub fn lock_error(name: &str) -> String {
-    format!("{name} state is unavailable")
+impl DesktopState {
+    /// The adopted workspace, recovering from a poisoned lock.
+    ///
+    /// A panic inside a critical section poisons the mutex, and propagating
+    /// that made every later workspace operation fail for the life of the
+    /// process -- one fault became a permanently broken application. The data
+    /// behind the lock is a handle that is no less valid because an unrelated
+    /// call panicked, so recovery is correct rather than merely convenient.
+    pub fn workspace_guard(&self) -> MutexGuard<'_, Option<WorkspaceService>> {
+        self.workspace
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    pub fn watch_guard(&self) -> MutexGuard<'_, Option<WorkspaceWatch>> {
+        self.watch
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
 }
 
 /// Adopts `root` as the workspace, dropping any watch on the previous one.
@@ -27,15 +46,8 @@ pub fn lock_error(name: &str) -> String {
 /// confinement is established the same way whichever named the directory.
 pub fn adopt_workspace(state: &DesktopState, root: &Path) -> Result<Option<String>, String> {
     let workspace = WorkspaceService::new(root).map_err(|error| error.to_string())?;
-    state
-        .watch
-        .lock()
-        .map_err(|_| lock_error("workspace watch"))?
-        .take();
-    *state
-        .workspace
-        .lock()
-        .map_err(|_| lock_error("workspace"))? = Some(workspace);
+    state.watch_guard().take();
+    *state.workspace_guard() = Some(workspace);
     Ok(Some(root.display().to_string()))
 }
 
