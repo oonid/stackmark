@@ -12,24 +12,31 @@ function commands(overrides: Partial<WorkspaceCommands> = {}): WorkspaceCommands
   } as WorkspaceCommands
 }
 
-it('starts watching the folder it adopted', async () => {
+it('adopts a folder without starting a watcher', async () => {
   const surface = commands()
   const host = createTauriWorkspaceHost(surface, vi.fn())
 
   await expect(host.adopt()).resolves.toBe('/tmp/notes')
+  // Watching is a separate request. Tying it to the picker meant a workspace
+  // adopted any other way -- a folder named when the process was launched --
+  // was never watched at all.
+  expect(surface.startWorkspaceWatch).not.toHaveBeenCalled()
+})
+
+it('starts the native watcher when asked to watch', async () => {
+  const surface = commands()
+  const host = createTauriWorkspaceHost(surface, vi.fn(async () => () => {}))
+
+  await host.watch(() => {})
   expect(surface.startWorkspaceWatch).toHaveBeenCalled()
 })
 
-it('does not start a watcher when the picker was cancelled', async () => {
-  const surface = commands({
-    chooseWorkspace: vi.fn(async () => ({ status: 'ok', data: null })),
-  })
-  const host = createTauriWorkspaceHost(surface, vi.fn())
-
+it('reports a workspace that was never adopted', async () => {
+  const host = createTauriWorkspaceHost(
+    commands({ chooseWorkspace: vi.fn(async () => ({ status: 'ok', data: null })) }),
+    vi.fn(),
+  )
   await expect(host.adopt()).resolves.toBeNull()
-  // Watching a folder nobody chose would report changes the user never asked
-  // about, against a root this side was never given.
-  expect(surface.startWorkspaceWatch).not.toHaveBeenCalled()
 })
 
 it('reports a workspace adopted before the interface existed', async () => {

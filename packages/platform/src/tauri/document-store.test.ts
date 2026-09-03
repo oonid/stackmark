@@ -58,6 +58,22 @@ it('keeps the message of an unexpected failure', async () => {
   })
 })
 
+it('describes a command refused by the capability list', async () => {
+  // The host rejects with a string, not a tagged error. Reading `.message` off
+  // it produced "undefined", which told a user nothing at all.
+  const store = createTauriDocumentStore('workspace-1', commands({
+    writeDocument: vi.fn(async () => ({
+      status: 'error',
+      error: 'write_document not allowed. Permission not found.',
+    })),
+  }))
+
+  await expect(store.write('doc-1', 'x')).rejects.toEqual({
+    kind: 'unexpected',
+    message: 'write_document not allowed. Permission not found.',
+  })
+})
+
 it('renames the native field names onto the shared model', async () => {
   const store = createTauriDocumentStore('workspace-1', commands())
   const written = await store.write('doc-1', 'x')

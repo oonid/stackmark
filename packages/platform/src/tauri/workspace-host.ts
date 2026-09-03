@@ -24,6 +24,11 @@ async function unwrap<T>(
 ): Promise<T> {
   const result = await call
   if (result.status === 'ok') return result.data
+  // A refused command is rejected with a plain string rather than a tagged
+  // error, so it is wrapped rather than thrown raw.
+  if (typeof result.error !== 'object' || result.error === null) {
+    throw { kind: 'unexpected', message: String(result.error) }
+  }
   throw result.error
 }
 
@@ -42,21 +47,21 @@ export function createTauriWorkspaceHost(
   return {
     supported: true,
 
-    async adopt(): Promise<string | null> {
-      const root = await unwrap(commands.chooseWorkspace())
-      // A cancelled picker leaves no workspace, and starting a watcher then
-      // would report changes nobody asked about, on a root this side was never
-      // given.
-      if (root === null) return null
-      await unwrap(commands.startWorkspaceWatch())
-      return root
+    adopt(): Promise<string | null> {
+      return unwrap(commands.chooseWorkspace())
     },
 
     current(): Promise<string | null> {
       return unwrap(commands.currentWorkspace())
     },
 
-    watch(listener: (change: ExternalChange) => void): Promise<Unsubscribe> {
+    async watch(listener: (change: ExternalChange) => void): Promise<Unsubscribe> {
+      // Starting the native watcher belongs here rather than in `adopt`. A
+      // workspace can be adopted without the picker ever running -- a folder
+      // named when the process was launched does exactly that -- and tying the
+      // watcher to the picker meant those sessions silently never detected an
+      // external change at all.
+      await unwrap(commands.startWorkspaceWatch())
       // The event name is generated from the Rust definition, so renaming it on
       // either side makes the committed bindings stale and fails the build.
       return listen(EXTERNAL_CHANGE_EVENT, ({ payload }) => {

@@ -72,6 +72,12 @@ export interface WorkspaceHost {
  *
  * Every method addresses a document by identifier. `create` and `rename` take a
  * path because that is when a location is chosen; nothing else does.
+ *
+ * The desktop implementation requires the parent directory to exist: creating
+ * `notes/daily.md` in a workspace with no `notes` folder fails. The web
+ * implementation has no directories and accepts it. That asymmetry is a known
+ * gap, not a design intent — creating a directory has to happen beneath the
+ * held root descriptor to stay confined, and that work is not done here.
  */
 export interface DocumentStore {
   list(): Promise<DocumentSummary[]>

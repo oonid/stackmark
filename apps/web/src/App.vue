@@ -4,7 +4,7 @@ import { renderMarkdown } from '@stackmark/markdown'
 import MarkdownPreview from './MarkdownPreview.vue'
 import PrintProof from './print/PrintProof.vue'
 import { isTauri } from '@tauri-apps/api/core'
-import type { DocumentMetadata } from '@stackmark/core'
+import type { DocumentMetadata, DocumentSummary } from '@stackmark/core'
 import {
   createTauriDocumentStore,
   createTauriWorkspaceHost,
@@ -35,6 +35,15 @@ const desktopStatus = ref(
     : 'Folder selection and atomic saves require the Tauri desktop capability.',
 )
 const savedFile = ref<DocumentMetadata>()
+
+// Controls for every document command, so the round-trip test can reach each
+// one through the interface. This is harness surface in a screen Stage 2
+// deletes, and unlike a query parameter it is reachable only by interacting
+// with a visible control.
+const documentPath = ref('round-trip.md')
+const documents = ref<DocumentSummary[]>([])
+const documentStatus = ref('')
+const documentContent = ref('')
 const externalChange = ref<ExternalChange>()
 let stopWatching: (() => void) | undefined
 let renderTimer: ReturnType<typeof window.setTimeout> | undefined
@@ -69,9 +78,6 @@ async function runDesktopProof(): Promise<void> {
   desktopBusy.value = true
   desktopStatus.value = 'Waiting for workspace selection…'
   try {
-    stopWatching ??= await workspaceHost.watch((change) => {
-      externalChange.value = change
-    })
     // A workspace may already be adopted, from a folder named when the process
     // was launched. Asking the user to pick it again would be wrong.
     const root = (await workspaceHost.current()) ?? (await workspaceHost.adopt())
@@ -79,6 +85,11 @@ async function runDesktopProof(): Promise<void> {
       desktopStatus.value = 'Workspace selection cancelled.'
       return
     }
+    // Watching starts the native watcher, so it can only run once a workspace
+    // exists.
+    stopWatching ??= await workspaceHost.watch((change) => {
+      externalChange.value = change
+    })
 
     documentStore ??= createTauriDocumentStore(root)
     // The path is used once to find or register the document; every later
@@ -93,6 +104,77 @@ async function runDesktopProof(): Promise<void> {
   } finally {
     desktopBusy.value = false
   }
+}
+
+/** Runs a document operation, reporting failures by category. */
+async function operate(what: string, work: (store: DocumentStore) => Promise<string>): Promise<void> {
+  const store = await documentStoreForWorkspace()
+  if (!store) {
+    documentStatus.value = 'Choose a workspace first.'
+    return
+  }
+  try {
+    documentStatus.value = await work(store)
+    documents.value = await store.list()
+  } catch (error) {
+    documentStatus.value = `${what} failed: ${describeFailure(error)}`
+  }
+}
+
+async function documentStoreForWorkspace(): Promise<DocumentStore | undefined> {
+  if (documentStore) return documentStore
+  if (!workspaceHost.supported) return undefined
+  const root = await workspaceHost.current()
+  if (root === null) return undefined
+  documentStore = createTauriDocumentStore(root)
+  return documentStore
+}
+
+function listDocuments(): Promise<void> {
+  return operate('Listing', async (store) => `Listed ${(await store.list()).length} documents.`)
+}
+
+function createDocument(): Promise<void> {
+  return operate('Creating', async (store) => {
+    const created = await store.create(documentPath.value, markdownSource.value)
+    return `Created ${created.path} as ${created.id}.`
+  })
+}
+
+function writeFirstDocument(): Promise<void> {
+  return operate('Writing', async (store) => {
+    const [first] = await store.list()
+    if (!first) return 'Nothing to write.'
+    const written = await store.write(first.id, markdownSource.value)
+    return `Wrote ${written.path}, hash ${written.contentHash.slice(0, 8)}.`
+  })
+}
+
+function readFirstDocument(): Promise<void> {
+  return operate('Reading', async (store) => {
+    const [first] = await store.list()
+    if (!first) return 'Nothing to read.'
+    documentContent.value = (await store.read(first.id)).content
+    return `Read ${first.path}, ${documentContent.value.length} characters.`
+  })
+}
+
+function renameFirstDocument(): Promise<void> {
+  return operate('Renaming', async (store) => {
+    const [first] = await store.list()
+    if (!first) return 'Nothing to rename.'
+    const renamed = await store.rename(first.id, documentPath.value)
+    return `Renamed to ${renamed.path}.`
+  })
+}
+
+function removeFirstDocument(): Promise<void> {
+  return operate('Removing', async (store) => {
+    const [first] = await store.list()
+    if (!first) return 'Nothing to remove.'
+    await store.remove(first.id)
+    return `Removed ${first.path}.`
+  })
 }
 
 /** Turns a contract error into something a person can read. */
@@ -165,6 +247,22 @@ const forcePrintFallback =
           <dt>Modified</dt>
           <dd>{{ savedFile.modifiedAt }}</dd>
         </dl>
+        <div v-if="workspaceHost.supported" class="document-operations">
+          <label>
+            Path
+            <input v-model="documentPath" data-testid="document-path" type="text">
+          </label>
+          <button type="button" data-testid="list-documents" @click="listDocuments">List</button>
+          <button type="button" data-testid="create-document" @click="createDocument">Create</button>
+          <button type="button" data-testid="write-document" @click="writeFirstDocument">Write</button>
+          <button type="button" data-testid="read-document" @click="readFirstDocument">Read</button>
+          <button type="button" data-testid="rename-document" @click="renameFirstDocument">Rename</button>
+          <button type="button" data-testid="remove-document" @click="removeFirstDocument">Remove</button>
+          <p data-testid="document-status">{{ documentStatus }}</p>
+          <ul data-testid="document-list">
+            <li v-for="entry in documents" :key="entry.id">{{ entry.path }}</li>
+          </ul>
+        </div>
         <dl v-if="externalChange" class="proof-metadata" data-testid="desktop-external-change">
           <dt>External change</dt>
           <dd>{{ externalChange.path }}</dd>

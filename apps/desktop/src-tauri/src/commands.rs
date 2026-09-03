@@ -148,7 +148,21 @@ pub fn rename_document(
     path: String,
     state: State<'_, DesktopState>,
 ) -> Result<(), DesktopError> {
-    with_metadata(&state, |metadata| metadata.rename(&id, &path))
+    let from = with_metadata(&state, |metadata| metadata.resolve(&id))?;
+
+    // The register is updated first: its unique index is what refuses an
+    // occupied path, and learning that before the file has moved means nothing
+    // has to be undone. If the move then fails, the register is put back, so
+    // the two never disagree about where the document is.
+    with_metadata(&state, |metadata| metadata.rename(&id, &path))?;
+    let to = with_metadata(&state, |metadata| metadata.resolve(&id))?;
+
+    let workspace = require_workspace(&state)?;
+    if let Err(error) = workspace.rename_markdown(&from, &to) {
+        let _ = with_metadata(&state, |metadata| metadata.rename(&id, &from));
+        return Err(DesktopError::unexpected(error.to_string()));
+    }
+    Ok(())
 }
 
 #[tauri::command(rename_all = "camelCase")]

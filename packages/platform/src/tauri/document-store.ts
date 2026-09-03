@@ -47,16 +47,24 @@ type NativeRow = {
  * and an error that cannot say which document it concerns is much less useful
  * to whoever has to handle it.
  */
-function toStoreError(error: NativeError, id?: DocumentId): StoreError {
-  switch (error.kind) {
+function toStoreError(error: unknown, id?: DocumentId): StoreError {
+  // Not every failure is one of ours. A command refused by the capability list
+  // is rejected by the host with a plain string, and reading `.message` off it
+  // yielded `undefined` -- the exact opaque failure these categories exist to
+  // replace, arriving through the one path nobody had exercised.
+  if (typeof error !== 'object' || error === null || !('kind' in error)) {
+    return { kind: 'unexpected', message: String(error) }
+  }
+  const tagged = error as NativeError
+  switch (tagged.kind) {
     case 'not-found':
       return { kind: 'not-found', id: id ?? '' }
     case 'changed-underneath':
       return { kind: 'changed-underneath', id: id ?? '' }
     case 'outside-workspace':
-      return { kind: 'outside-workspace', path: error.path }
+      return { kind: 'outside-workspace', path: tagged.path }
     default:
-      return { kind: 'unexpected', message: error.message }
+      return { kind: 'unexpected', message: tagged.message }
   }
 }
 
@@ -66,7 +74,7 @@ async function unwrap<T>(
 ): Promise<T> {
   const result = await call
   if (result.status === 'ok') return result.data
-  throw toStoreError(result.error as NativeError, id)
+  throw toStoreError(result.error, id)
 }
 
 function toSummary(row: NativeRow, workspaceId: string): DocumentSummary {
