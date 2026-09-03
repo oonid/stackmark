@@ -102,7 +102,7 @@ async startWorkspaceWatch() : Promise<Result<null, DesktopError>> {
 
 /** user-defined constants **/
 
-
+export const EXTERNAL_CHANGE_EVENT = "workspace://external-change" as const;
 
 /** user-defined types **/
 

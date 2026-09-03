@@ -115,17 +115,22 @@ pub fn adopt_startup_path(path: &Path) -> Result<PathBuf, String> {
 /// and `run` registers it, so a command cannot be generated without being
 /// reachable or reachable without being generated.
 pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
-    tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
-        commands::choose_workspace,
-        commands::current_workspace,
-        commands::list_documents,
-        commands::read_document,
-        commands::write_document,
-        commands::create_document,
-        commands::rename_document,
-        commands::remove_document,
-        commands::start_workspace_watch,
-    ])
+    tauri_specta::Builder::<tauri::Wry>::new()
+        // The watcher event name is generated too, so changing it here changes
+        // bindings.ts and continuous integration fails on the stale file. Task 1
+        // left this uncovered: a renamed event was still silent.
+        .constant("EXTERNAL_CHANGE_EVENT", EXTERNAL_CHANGE_EVENT)
+        .commands(tauri_specta::collect_commands![
+            commands::choose_workspace,
+            commands::current_workspace,
+            commands::list_documents,
+            commands::read_document,
+            commands::write_document,
+            commands::create_document,
+            commands::rename_document,
+            commands::remove_document,
+            commands::start_workspace_watch,
+        ])
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
