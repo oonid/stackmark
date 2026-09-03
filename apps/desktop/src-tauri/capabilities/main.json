@@ -9,8 +9,13 @@
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "allow-choose-workspace",
-    "allow-read-markdown",
-    "allow-atomic-write-markdown",
+    "allow-current-workspace",
+    "allow-list-documents",
+    "allow-read-document",
+    "allow-write-document",
+    "allow-create-document",
+    "allow-rename-document",
+    "allow-remove-document",
     "allow-start-workspace-watch"
   ]
 }

@@ -86,3 +86,47 @@ jobs:
         working-directory: apps/desktop/src-tauri
       - run: cargo test
         working-directory: apps/desktop/src-tauri
+      # cargo test regenerates the bindings. If the committed file no longer
+      # matches the Rust definitions, a command drifted without the TypeScript
+      # side being updated, and that is a build failure rather than something
+      # for a user to discover.
+      - name: Fail if the generated bindings are stale
+        run: git diff --exit-code packages/platform/src/tauri/bindings.ts
+
+  roundtrip:
+    name: Desktop round trip
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      # The generated bindings prove the names and shapes agree. They cannot see
+      # capabilities/main.json, so only this job notices a command that
+      # type-checks and is then refused at runtime -- the shape of both defects
+      # that reached a build already recorded as passing.
+      - name: Install the driver and the Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential \
+            libayatana-appindicator3-dev \
+            libgtk-3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            pkg-config \
+            webkit2gtk-driver \
+            xvfb
+      - name: Install the pinned toolchain
+        run: rustup show active-toolchain
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+      - run: cargo install tauri-driver --locked
+      - run: ./dev install
+      # Must be the bundled artifact. A plain `cargo build --release` produces a
+      # binary that loads the development server URL and renders nothing, so the
+      # test would drive an empty window.
+      - run: ./dev desktop-build
+      - name: Drive every command through real IPC
+        run: xvfb-run -a cargo test --test roundtrip -- --ignored --test-threads=1
+        working-directory: apps/desktop/src-tauri

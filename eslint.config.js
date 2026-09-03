@@ -7,6 +7,10 @@ module.exports = tseslint.config(
     ignores: [
       '**/dist/**',
       'apps/web/public/generated/**',
+      // Generated from the Rust command definitions and committed so that
+      // drift is a build failure. It carries a do-not-edit banner, so
+      // linting it would only ever produce noise nobody may act on.
+      'packages/platform/src/tauri/bindings.ts',
       '**/node_modules/**',
       '**/target/**',
       'build/*.js',

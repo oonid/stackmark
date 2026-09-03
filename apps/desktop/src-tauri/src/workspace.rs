@@ -13,7 +13,7 @@ use std::os::fd::{AsRawFd, OwnedFd};
 
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 #[cfg(target_os = "linux")]
-use rustix::fs::{fstat, open, openat2, Mode, OFlags, ResolveFlags};
+use rustix::fs::{fstat, open, openat2, renameat, Mode, OFlags, ResolveFlags};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use tempfile::NamedTempFile;
@@ -39,7 +39,7 @@ pub enum WorkspaceError {
     Notify(#[from] notify::Error),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FileMetadata {
     pub path: String,
@@ -47,13 +47,13 @@ pub struct FileMetadata {
     pub mtime_unix_ms: u64,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, specta::Type)]
 #[serde(rename_all = "lowercase")]
 pub enum WorkspaceEventKind {
     Modified,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceEvent {
     pub kind: WorkspaceEventKind,
@@ -256,6 +256,50 @@ impl WorkspaceService {
         self.ensure_same_directory(parent_relative, &parent_fd, &relative)?;
 
         Ok(metadata)
+    }
+
+    /// Moves a Markdown file within the workspace.
+    ///
+    /// Both ends are validated and both parent directories are opened beneath
+    /// the held root descriptor, so neither side of the move can leave the
+    /// workspace even if a component is swapped for a symlink between the
+    /// check and the rename: the rename is performed against the directory
+    /// descriptors, not against the paths.
+    ///
+    /// The database and the filesystem must move together. A rename that
+    /// changed only the register would leave the document pointing at a path
+    /// with no file behind it, which is worse than refusing.
+    pub fn rename_markdown(
+        &self,
+        from: impl AsRef<Path>,
+        to: impl AsRef<Path>,
+    ) -> Result<(), WorkspaceError> {
+        let from = validate_relative_markdown(from.as_ref())?;
+        let to = validate_relative_markdown(to.as_ref())?;
+
+        #[cfg(target_os = "linux")]
+        {
+            let from_parent =
+                self.open_directory_beneath(from.parent().unwrap_or(Path::new("")))?;
+            let to_parent = self.open_directory_beneath(to.parent().unwrap_or(Path::new("")))?;
+            let from_name = from
+                .file_name()
+                .ok_or_else(|| WorkspaceError::InvalidPath(relative_to_string(&from)))?;
+            let to_name = to
+                .file_name()
+                .ok_or_else(|| WorkspaceError::InvalidPath(relative_to_string(&to)))?;
+
+            renameat(&from_parent, from_name, &to_parent, to_name)
+                .map_err(|error| WorkspaceError::Io(error.into()))?;
+            return Ok(());
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let source = self.root.join(&from);
+            let target = self.root.join(&to);
+            fs::rename(source, target)?;
+            Ok(())
+        }
     }
 
     #[cfg(target_os = "linux")]

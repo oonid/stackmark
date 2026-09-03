@@ -79,7 +79,11 @@ Recorded in the evidence file and unfixed, in rough order of consequence:
 7. Replacing a watched file with a symlink is silently ignored, with no signal to the interface
    and no test.
 8. The `.deb` build is not reproducible, which Stage 4 requires.
-9. **An external change is reported but never reconciled.** The interface shows the new hash while
+9. **Creating a document in a subdirectory fails on the desktop.** The web store
+   accepts a nested path because IndexedDB has no directories; the desktop needs
+   the parent to exist. Creating one has to happen beneath the held root
+   descriptor to stay confined. Recorded in ADR 0003 as D2.
+10. **An external change is reported but never reconciled.** The interface shows the new hash while
    the editor keeps its own copy, so the next save silently discards the other writer's work.
    Stage 0 scoped detection only; reload and conflict handling belong to Stage 1. Demonstrated
    against the installed package, not inferred.

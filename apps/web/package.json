@@ -18,7 +18,9 @@
     "@tauri-apps/plugin-dialog": "2.7.2",
     "katex": "0.18.1",
     "mermaid": "11.16.0",
-    "vue": "3.5.40"
+    "vue": "3.5.40",
+    "@stackmark/platform": "workspace:*",
+    "@stackmark/core": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "1.54.2",
