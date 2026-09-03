@@ -89,13 +89,25 @@ in `ldd` output, which looks at first like a new dependency, but `objdump -p`
 shows zero direct `NEEDED` entries for it: it arrives transitively through
 `libwebkit2gtk-4.1.so.0`, which needs it directly and is already declared.
 
+## Host gates against the installed package
+
+Run on 2026-09-03 against the installed `.deb`, because this stage rewrote the
+code behind all four.
+
+| Gate | Result |
+|---|---|
+| Folder selection | adopted `/tmp/stackmark-2` through the real picker |
+| Save | written inside the chosen root, mode 0600 |
+| External change | reported hash `d368b624…3164`, matching the file on disk exactly |
+| Print | A4, 595 x 842 points, 2 pages, no raster image, diagram with its connector |
+
+The hash the save card reported was not captured before the external edit
+superseded it, so the reported-against-disk comparison covers the external change
+and not the save. The save path is the same code the round trip drives against
+this binary, where file content is checked on disk.
+
 ## Not verified here
 
-- **The four host gates against the installed package.** Stage 1A rewrote the
-  code behind folder selection, saving, external-change detection and printing.
-  ADR 0001 condition 0 says a gate is not passed until it is exercised in a
-  packaged build, so these must be run against the installed `.deb` before the
-  stage is called complete.
 - **Reproducibility.** Successive builds still produce different artifacts.
 - **The non-Linux filesystem path**, which remains check-then-use and unreachable
   on the shipped target.

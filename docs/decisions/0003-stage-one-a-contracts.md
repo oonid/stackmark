@@ -1,6 +1,6 @@
 # 0003 — Stage 1A contracts and document persistence
 
-- **Status:** Proposed. Conditional go, pending the host gates named below.
+- **Status:** Accepted. **Go.**
 - **Date:** 2026-09-03
 - **Scope:** The first half of Stage 1: core models, platform contracts, a web
   and a desktop document store, and a tested JavaScript-to-Rust boundary.
@@ -91,16 +91,28 @@ with a control string to prove the search would have found it.
 
 ## Decision
 
-**Conditional go.** The boundary is proven, both storage implementations satisfy
-the same contract, and the packaged artifact passes inspection with its
-dependency set unchanged.
+**Go.** The boundary is proven, both storage implementations satisfy the same
+contract, and the packaged artifact passes inspection with its dependency set
+unchanged.
 
-The condition is not procedural. Stage 1A rewrote the code behind folder
-selection, saving, external-change detection and printing, and ADR 0001 condition
-0 says a gate is not passed until it is exercised in a packaged build. Those four
-gates must be run against the installed package before Stage 1B is authorised.
-The stage produced four defects that only appeared when the built application was
-driven, which is the argument for the condition rather than an exception to it.
+The four host gates were run against the installed package on 2026-09-03, because
+this stage rewrote the code behind all of them. Folder selection worked through
+the real picker; the file was written inside the chosen root with mode 0600; the
+watcher reported an external edit with a hash matching the file on disk exactly;
+and the print dialog produced a two-page A4 document, 595 by 842 points,
+containing no raster image, with the Mermaid diagram drawn with its connector and
+arrowhead and the KaTeX expression rendered.
+
+One limit is worth naming rather than leaving implied. The hash the save card
+reported was not captured before the external edit superseded it, so the
+reported-against-disk comparison was made for the external change and not for the
+save. The save path is the same code the round trip drives against this binary,
+where the file content is checked on disk, so it is covered — but by a different
+run than the one a reader might assume.
+
+The stage produced four defects that appeared only when the built application was
+driven, which is the argument for exercising gates against a package rather than
+an exception to it.
 
 Conditions carried forward:
 
