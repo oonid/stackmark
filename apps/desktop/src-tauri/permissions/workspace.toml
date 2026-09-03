@@ -9,14 +9,34 @@ description = "Allows the main window to ask which workspace, if any, the applic
 commands.allow = ["current_workspace"]
 
 [[permission]]
-identifier = "allow-read-markdown"
-description = "Allows the main window to read a validated Markdown path under the workspace root."
-commands.allow = ["read_markdown"]
+identifier = "allow-list-documents"
+description = "Allows the main window to list the documents registered in the current workspace."
+commands.allow = ["list_documents"]
 
 [[permission]]
-identifier = "allow-atomic-write-markdown"
-description = "Allows the main window to atomically replace a validated Markdown path under the workspace root."
-commands.allow = ["atomic_write_markdown"]
+identifier = "allow-read-document"
+description = "Allows the main window to read a document by identifier. The path is resolved natively."
+commands.allow = ["read_document"]
+
+[[permission]]
+identifier = "allow-write-document"
+description = "Allows the main window to atomically replace a document identified by identifier."
+commands.allow = ["write_document"]
+
+[[permission]]
+identifier = "allow-create-document"
+description = "Allows the main window to register a workspace-relative path and write its first contents."
+commands.allow = ["create_document"]
+
+[[permission]]
+identifier = "allow-rename-document"
+description = "Allows the main window to move a document to another workspace-relative path."
+commands.allow = ["rename_document"]
+
+[[permission]]
+identifier = "allow-remove-document"
+description = "Allows the main window to remove a document from the workspace register."
+commands.allow = ["remove_document"]
 
 [[permission]]
 identifier = "allow-start-workspace-watch"

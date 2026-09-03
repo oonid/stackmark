@@ -15,7 +15,7 @@ export const commands = {
  * Owning the picker is what makes the root the user's choice, and it lets the
  * webview drop the dialog capability entirely.
  */
-async chooseWorkspace() : Promise<Result<string | null, string>> {
+async chooseWorkspace() : Promise<Result<string | null, DesktopError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("choose_workspace") };
 } catch (e) {
@@ -28,10 +28,9 @@ async chooseWorkspace() : Promise<Result<string | null, string>> {
  * 
  * A root can be adopted before the interface exists — the startup path
  * argument does exactly that — and re-asking the user to pick a folder they
- * already named would be wrong. It also lets an automated session drive the
- * application without a human in the folder dialog.
+ * already named would be wrong. It returns a path but cannot set one.
  */
-async currentWorkspace() : Promise<Result<string | null, string>> {
+async currentWorkspace() : Promise<Result<string | null, DesktopError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("current_workspace") };
 } catch (e) {
@@ -39,23 +38,55 @@ async currentWorkspace() : Promise<Result<string | null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async readMarkdown(path: string) : Promise<Result<string, string>> {
+async listDocuments() : Promise<Result<DocumentRow[], DesktopError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("read_markdown", { path }) };
+    return { status: "ok", data: await TAURI_INVOKE("list_documents") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
-async atomicWriteMarkdown(path: string, contents: string) : Promise<Result<FileMetadata, string>> {
+async readDocument(id: string) : Promise<Result<string, DesktopError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("atomic_write_markdown", { path, contents }) };
+    return { status: "ok", data: await TAURI_INVOKE("read_document", { id }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
-async startWorkspaceWatch() : Promise<Result<null, string>> {
+async writeDocument(id: string, contents: string) : Promise<Result<FileMetadata, DesktopError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("write_document", { id, contents }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async createDocument(path: string, contents: string) : Promise<Result<DocumentRow, DesktopError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("create_document", { path, contents }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async renameDocument(id: string, path: string) : Promise<Result<null, DesktopError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("rename_document", { id, path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async removeDocument(id: string) : Promise<Result<null, DesktopError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("remove_document", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async startWorkspaceWatch() : Promise<Result<null, DesktopError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("start_workspace_watch") };
 } catch (e) {
@@ -75,6 +106,27 @@ async startWorkspaceWatch() : Promise<Result<null, string>> {
 
 /** user-defined types **/
 
+export type DesktopError = 
+/**
+ * The path escapes the workspace, or is not a path this application will
+ * accept. Refused before anything touches the filesystem.
+ */
+{ kind: "outside-workspace"; path: string } | 
+/**
+ * No document with that identifier.
+ */
+{ kind: "not-found" } | 
+/**
+ * The file changed since it was last read, so writing would discard
+ * somebody else's work.
+ */
+{ kind: "changed-underneath" } | 
+/**
+ * Anything not worth a category of its own. The message is for a log, not
+ * for a caller to parse.
+ */
+{ kind: "unexpected"; message: string }
+export type DocumentRow = { id: string; path: string; sha256: string | null; mtimeUnixMs: number | null }
 export type FileMetadata = { path: string; sha256: string; mtimeUnixMs: number }
 
 /** tauri-specta globals **/

@@ -15,8 +15,11 @@ describe('desktop proof gateway', () => {
     const bridge: DesktopProofBridge = {
       invoke: vi.fn(async (command: string) => {
         if (command === 'choose_workspace') return '/tmp/stackmark-proof'
-        if (command === 'atomic_write_markdown') {
+        // Nothing registered yet, so saving has to create the document.
+        if (command === 'list_documents') return []
+        if (command === 'create_document') {
           return {
+            id: 'document-1',
             path: 'stage-zero-proof.md',
             sha256: 'proof-hash',
             mtimeUnixMs: 42,
@@ -56,9 +59,37 @@ describe('desktop proof gateway', () => {
     // there is no argument here for a compromised page to control.
     expect(bridge.invoke).toHaveBeenNthCalledWith(1, 'choose_workspace')
     expect(bridge.invoke).toHaveBeenNthCalledWith(2, 'start_workspace_watch')
-    expect(bridge.invoke).toHaveBeenNthCalledWith(3, 'atomic_write_markdown', {
+    expect(bridge.invoke).toHaveBeenNthCalledWith(3, 'list_documents')
+    expect(bridge.invoke).toHaveBeenNthCalledWith(4, 'create_document', {
       path: 'stage-zero-proof.md',
       contents: '# Stage 0\n',
+    })
+  })
+
+  it('writes by identifier when the document is already registered', async () => {
+    const bridge: DesktopProofBridge = {
+      invoke: vi.fn(async (command: string) => {
+        if (command === 'list_documents') {
+          return [{ id: 'document-1', path: 'stage-zero-proof.md' }]
+        }
+        if (command === 'write_document') {
+          return { path: 'stage-zero-proof.md', sha256: 'second-hash', mtimeUnixMs: 99 }
+        }
+        return undefined
+      }),
+      listen: vi.fn(),
+    }
+    const gateway = createDesktopProofGateway(bridge)
+
+    await expect(gateway.saveProof('# again\n')).resolves.toEqual({
+      path: 'stage-zero-proof.md',
+      sha256: 'second-hash',
+      mtimeUnixMs: 99,
+    })
+    // The path was used once to find the document and never sent again.
+    expect(bridge.invoke).toHaveBeenNthCalledWith(2, 'write_document', {
+      id: 'document-1',
+      contents: '# again\n',
     })
   })
 

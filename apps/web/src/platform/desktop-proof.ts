@@ -73,10 +73,22 @@ export function createDesktopProofGateway(
     },
     async saveProof(contents) {
       if (!bridge) unsupported()
-      return bridge.invoke('atomic_write_markdown', {
+      // Documents are addressed by identifier, so the path is used once to
+      // find or register the document and never sent again. Task 9 replaces
+      // this screen with the real contracts; this keeps it working meanwhile.
+      const documents = await bridge.invoke('list_documents') as { id: string; path: string }[]
+      const existing = documents.find((document) => document.path === PROOF_PATH)
+      if (existing) {
+        return bridge.invoke('write_document', {
+          id: existing.id,
+          contents,
+        }) as Promise<WorkspaceFileMetadata>
+      }
+      const created = await bridge.invoke('create_document', {
         path: PROOF_PATH,
         contents,
-      }) as Promise<WorkspaceFileMetadata>
+      }) as { id: string; path: string; sha256: string; mtimeUnixMs: number }
+      return { path: created.path, sha256: created.sha256, mtimeUnixMs: created.mtimeUnixMs }
     },
     async watchExternalChanges(listener) {
       if (!bridge) unsupported()

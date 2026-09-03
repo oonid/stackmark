@@ -209,7 +209,12 @@ the end of a stage is the whole stage.
 2. `WorkspaceHost` and `DocumentStore` are defined once and implemented twice.
 3. A document can be created, listed, read, written, renamed and deleted on both
    surfaces through the same contract.
-4. TypeScript sends no filesystem path to Rust in any command.
+4. No command accepts a filesystem location. Documents are addressed by
+   identifier; `create` and `rename` accept a workspace-relative logical path,
+   because choosing a location is what those operations are, and it is
+   normalized and refused by the same rules the core applies before anything
+   is stored. No command accepts a workspace root or an absolute path, so the
+   web layer still cannot name the directory its access is confined to.
 5. Regenerating the bindings produces no diff, and continuous integration enforces
    this.
 6. The round-trip test invokes every command and observes the watcher event

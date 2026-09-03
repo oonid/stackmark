@@ -6,7 +6,11 @@ pub mod workspace;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
+use sha2::{Digest, Sha256};
 use tauri::Manager;
+
+use crate::error::DesktopError;
+use crate::metadata::Metadata;
 use workspace::{WorkspaceService, WorkspaceWatch};
 
 /// The event the watcher emits. Named once so the Rust side and the generated
@@ -17,6 +21,7 @@ pub const EXTERNAL_CHANGE_EVENT: &str = "workspace://external-change";
 pub struct DesktopState {
     pub workspace: Mutex<Option<WorkspaceService>>,
     pub watch: Mutex<Option<WorkspaceWatch>>,
+    pub metadata: Mutex<Option<Metadata>>,
 }
 
 impl DesktopState {
@@ -38,15 +43,54 @@ impl DesktopState {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
+
+    pub fn metadata_guard(&self) -> MutexGuard<'_, Option<Metadata>> {
+        self.metadata
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+}
+
+/// Where a workspace's identity database lives.
+///
+/// Named by a digest of the canonical root, so a workspace keeps its document
+/// identifiers across sessions, and two workspaces never share a database. It
+/// lives in application data rather than in the user's folder: the design says
+/// the application does not create hidden files in a workspace.
+pub fn metadata_path(data_dir: &Path, root: &Path) -> PathBuf {
+    let digest = Sha256::digest(root.as_os_str().as_encoded_bytes());
+    let name = digest
+        .iter()
+        .take(16)
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    data_dir.join("workspaces").join(format!("{name}.sqlite3"))
 }
 
 /// Adopts `root` as the workspace, dropping any watch on the previous one.
 ///
 /// Both the folder picker and the startup path argument arrive here, so
 /// confinement is established the same way whichever named the directory.
-pub fn adopt_workspace(state: &DesktopState, root: &Path) -> Result<Option<String>, String> {
-    let workspace = WorkspaceService::new(root).map_err(|error| error.to_string())?;
+pub fn adopt_workspace(
+    state: &DesktopState,
+    root: &Path,
+    data_dir: &Path,
+) -> Result<Option<String>, DesktopError> {
+    let workspace =
+        WorkspaceService::new(root).map_err(|error| DesktopError::unexpected(error.to_string()))?;
+
+    let database = metadata_path(data_dir, root);
+    if let Some(parent) = database.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|error| DesktopError::unexpected(error.to_string()))?;
+    }
+    let metadata = Metadata::open(&database)?;
+
+    // The watch belongs to the previous root, so it is dropped before anything
+    // else changes rather than being left to report on a folder nobody is
+    // looking at.
     state.watch_guard().take();
+    *state.metadata_guard() = Some(metadata);
     *state.workspace_guard() = Some(workspace);
     Ok(Some(root.display().to_string()))
 }
@@ -74,8 +118,12 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
         commands::choose_workspace,
         commands::current_workspace,
-        commands::read_markdown,
-        commands::atomic_write_markdown,
+        commands::list_documents,
+        commands::read_document,
+        commands::write_document,
+        commands::create_document,
+        commands::rename_document,
+        commands::remove_document,
         commands::start_workspace_watch,
     ])
 }
@@ -93,7 +141,12 @@ pub fn run() {
             if let Some(argument) = std::env::args_os().nth(1) {
                 let requested = PathBuf::from(argument);
                 let root = adopt_startup_path(&requested)?;
-                adopt_workspace(&app.state::<DesktopState>(), &root)?;
+                let data_dir = app
+                    .path()
+                    .app_data_dir()
+                    .map_err(|error| error.to_string())?;
+                adopt_workspace(&app.state::<DesktopState>(), &root, &data_dir)
+                    .map_err(|error| error.to_string())?;
             }
             Ok(())
         })
