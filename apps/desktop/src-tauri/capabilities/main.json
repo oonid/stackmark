@@ -9,6 +9,7 @@
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "allow-choose-workspace",
+    "allow-current-workspace",
     "allow-read-markdown",
     "allow-atomic-write-markdown",
     "allow-start-workspace-watch"

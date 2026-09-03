@@ -41,10 +41,27 @@ pub async fn choose_workspace(
     crate::adopt_workspace(&state, &root)
 }
 
+/// The workspace already adopted, if there is one.
+///
+/// A root can be adopted before the interface exists — the startup path
+/// argument does exactly that — and re-asking the user to pick a folder they
+/// already named would be wrong. It also lets an automated session drive the
+/// application without a human in the folder dialog.
+#[tauri::command]
+#[specta::specta]
+pub fn current_workspace(state: State<'_, DesktopState>) -> Result<Option<String>, String> {
+    Ok(state
+        .workspace
+        .lock()
+        .map_err(|_| lock_error("workspace"))?
+        .as_ref()
+        .map(|workspace| workspace.root().display().to_string()))
+}
+
 #[tauri::command(rename_all = "camelCase")]
 #[specta::specta]
 pub fn read_markdown(path: String, state: State<'_, DesktopState>) -> Result<String, String> {
-    let workspace = current_workspace(&state)?;
+    let workspace = require_workspace(&state)?;
     let bytes = workspace
         .read_markdown(path)
         .map_err(|error| error.to_string())?;
@@ -58,7 +75,7 @@ pub fn atomic_write_markdown(
     contents: String,
     state: State<'_, DesktopState>,
 ) -> Result<FileMetadata, String> {
-    let workspace = current_workspace(&state)?;
+    let workspace = require_workspace(&state)?;
     workspace
         .atomic_write_markdown(path, contents.as_bytes())
         .map_err(|error| error.to_string())
@@ -67,7 +84,7 @@ pub fn atomic_write_markdown(
 #[tauri::command]
 #[specta::specta]
 pub fn start_workspace_watch(app: AppHandle, state: State<'_, DesktopState>) -> Result<(), String> {
-    let workspace = current_workspace(&state)?;
+    let workspace = require_workspace(&state)?;
     let watch = workspace
         .start_workspace_watch(move |event| {
             let _ = app.emit_to("main", crate::EXTERNAL_CHANGE_EVENT, event);
@@ -80,7 +97,7 @@ pub fn start_workspace_watch(app: AppHandle, state: State<'_, DesktopState>) -> 
     Ok(())
 }
 
-fn current_workspace(state: &State<'_, DesktopState>) -> Result<WorkspaceService, String> {
+fn require_workspace(state: &State<'_, DesktopState>) -> Result<WorkspaceService, String> {
     state
         .workspace
         .lock()

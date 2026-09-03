@@ -54,7 +54,7 @@ async function runDesktopProof(): Promise<void> {
     stopWatching ??= await desktopGateway.watchExternalChanges((change) => {
       externalChange.value = change
     })
-    const root = await desktopGateway.chooseWorkspace()
+    const root = (await desktopGateway.currentWorkspace()) ?? (await desktopGateway.chooseWorkspace())
     if (root === null) {
       desktopStatus.value = 'Workspace selection cancelled.'
       return

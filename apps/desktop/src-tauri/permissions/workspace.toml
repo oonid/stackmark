@@ -4,6 +4,11 @@ description = "Allows the main window to ask the application to open a folder pi
 commands.allow = ["choose_workspace"]
 
 [[permission]]
+identifier = "allow-current-workspace"
+description = "Allows the main window to ask which workspace, if any, the application has already adopted. It returns a path but cannot set one."
+commands.allow = ["current_workspace"]
+
+[[permission]]
 identifier = "allow-read-markdown"
 description = "Allows the main window to read a validated Markdown path under the workspace root."
 commands.allow = ["read_markdown"]

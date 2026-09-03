@@ -24,6 +24,7 @@ export interface DesktopProofBridge {
 
 export interface DesktopProofGateway {
   readonly supported: boolean
+  currentWorkspace(): Promise<string | null>
   chooseWorkspace(): Promise<string | null>
   saveProof(contents: string): Promise<WorkspaceFileMetadata>
   watchExternalChanges(
@@ -53,6 +54,13 @@ export function createDesktopProofGateway(
 ): DesktopProofGateway {
   return {
     supported: bridge !== undefined,
+    async currentWorkspace() {
+      if (!bridge) unsupported()
+      // A root may already be adopted — the startup path argument does that
+      // before the interface exists. Asking the user to pick a folder they
+      // already named would be wrong.
+      return await bridge.invoke('current_workspace') as string | null
+    },
     async chooseWorkspace() {
       if (!bridge) unsupported()
       // The application opens the picker and adopts the result itself. This

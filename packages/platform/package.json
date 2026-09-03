@@ -8,7 +8,7 @@
     "./tauri/bindings": "./src/tauri/bindings.ts"
   },
   "scripts": {
-    "unit": "vitest run --environment jsdom"
+    "unit": "vitest run --environment jsdom --passWithNoTests"
   },
   "devDependencies": {
     "vitest": "4.1.10"

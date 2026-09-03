@@ -23,6 +23,22 @@ async chooseWorkspace() : Promise<Result<string | null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * The workspace already adopted, if there is one.
+ * 
+ * A root can be adopted before the interface exists — the startup path
+ * argument does exactly that — and re-asking the user to pick a folder they
+ * already named would be wrong. It also lets an automated session drive the
+ * application without a human in the folder dialog.
+ */
+async currentWorkspace() : Promise<Result<string | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("current_workspace") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async readMarkdown(path: string) : Promise<Result<string, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("read_markdown", { path }) };
